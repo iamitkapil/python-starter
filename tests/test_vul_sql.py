@@ -1,7 +1,7 @@
 # tests/test_vuln_sql.py
 import sqlite3
 import pytest
-from vuln_sql import find_users_vulnerable, find_users_secure, init_db
+from app.vuln_sql import find_users_vulnerable, find_users_secure, init_db
 
 def test_vulnerable_returns_expected():
     # simple safe query behavior

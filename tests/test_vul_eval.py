@@ -1,6 +1,6 @@
 # tests/test_vuln_eval.py
 import pytest
-from vuln_eval import run_expression_vulnerable, run_expression_secure
+from app.vuln_eval import run_expression_vulnerable, run_expression_secure
 
 def test_eval_calculation():
     assert run_expression_vulnerable("2 + 3") == 5

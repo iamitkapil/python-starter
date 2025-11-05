@@ -1,0 +1,73 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:  # manual trigger also possible
+
+jobs:
+  ai-review:
+    runs-on: self-hosted   #
+
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v3
+
+      - name: Detect Changed Python Files
+        id: detect
+        shell: bash
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py')
+          echo "$CHANGED"
+          echo "$CHANGED" > changed_files.txt
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run AI Review on Changed Files
+        id: review
+        shell: bash
+        run: |
+          mkdir -p ai_reviews
+
+          while IFS= read -r FILE
+          do
+            if [ -f "$FILE" ]; then
+              
+              # Escape double-quotes so JSON is valid
+              CONTENT=$(sed 's/"/\\"/g' "$FILE")
+
+              PAYLOAD="{\"code\":\"$CONTENT\",\"file_path\":\"$FILE\",\"language\":\"python\"}"
+
+              echo "🔍 Sending $FILE to AI agent..."
+
+              RESPONSE=$(curl -s -X POST http://localhost:8000/api/review/code \
+                -H "Content-Type: application/json" \
+                -d "$PAYLOAD")
+
+              # Save response
+              OUTFILE="ai_reviews/$(basename $FILE).json"
+              echo "$RESPONSE" > "$OUTFILE"
+
+              echo "✅ AI Review for $FILE saved to $OUTFILE"
+            fi
+          done < changed_files.txt
+
+      - name: Combine AI Results
+        id: combine
+        shell: bash
+        run: |
+          echo "### 🤖 AI Code Review Results" > feedback.md
+          for f in ai_reviews/*.json; do
+            echo "\n**File: $(basename $f)**" >> feedback.md
+            cat $f >> feedback.md
+            echo "\n---" >> feedback.md
+          done
+          echo "done=true" >> $GITHUB_OUTPUT
+
+      - name: Post AI Review as PR Comment
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            $(cat feedback.md)

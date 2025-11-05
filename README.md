@@ -11,7 +11,7 @@ pytest
 
 ---
 
-# ✅ **6. GitHub Actions workflow (CI pipeline)**
+# **6. GitHub Actions workflow (CI pipeline)**
 
 Create:
 
@@ -38,3 +38,11 @@ jobs:
 
       - name: Run Tests
         run: pytest
+
+## Vulnerability test files
+
+This repo includes intentionally vulnerable example files:
+- vuln_sql.py — demonstrates SQL injection via string interpolation
+- vuln_eval.py — demonstrates unsafe use of eval()
+
+These are for testing and training the GenAI code-review agent. Not for production

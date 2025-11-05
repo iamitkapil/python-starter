@@ -15,15 +15,27 @@ jobs:
 
       - name: Detect Changed Python Files
         id: detect
-        shell: bash
+        shell: pwsh
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
         run: |
-          git fetch origin ${{ github.base_ref }}
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }} -- '*.py')
-          echo "$CHANGED"
-          echo "$CHANGED" > changed_files.txt
-          echo "files<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Fetch the base branch from origin
+          git fetch origin $env:BASE_REF
+
+          # Get changed python files between base and HEAD
+          $changed = git diff --name-only origin/$env:BASE_REF -- '*.py'
+
+          Write-Output "Changed files:"
+          Write-Output $changed
+
+          # Write changed files to a file
+          $changed | Out-File -Encoding utf8 changed_files.txt
+
+          # Set output variable 'files' for next steps
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<EOF"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value $changed
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "EOF"
+
 
       - name: Run AI Review on Changed Files
         id: review

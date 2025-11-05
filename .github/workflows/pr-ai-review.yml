@@ -7,7 +7,7 @@ on:
 
 jobs:
   ai-review:
-    runs-on: self-hosted   #
+    runs-on: self-hosted   
 
     steps:
       - name: Checkout PR Code
@@ -77,18 +77,20 @@ jobs:
 
       - name: Combine AI Results
         id: combine
-        shell: bash
+        shell: pwsh
         run: |
-          echo "### AI Code Review Results" > feedback.md
-          for f in ai_reviews/*.json; do
-            echo "\n**File: $(basename $f)**" >> feedback.md
-            cat $f >> feedback.md
-            echo "\n---" >> feedback.md
-          done
-          echo "done=true" >> $GITHUB_OUTPUT
+          # Create feedback file header
+          "### AI Code Review Results" | Out-File -Encoding utf8 feedback.md
 
-      - name: Post AI Review as PR Comment
-        uses: mshick/add-pr-comment@v2
-        with:
-          message: |
-            $(cat feedback.md)
+          # Collect all AI review JSONs
+          Get-ChildItem -Path "ai_reviews" -Filter "*.json" | ForEach-Object {
+              $file = $_.FullName
+              Add-Content -Path feedback.md -Value ""
+              Add-Content -Path feedback.md -Value "**File: $($_.Name)**"
+              Add-Content -Path feedback.md -Value (Get-Content $file -Raw)
+              Add-Content -Path feedback.md -Value "`n---`n"
+          }
+
+          # Set step output (optional)
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "done=true"
+

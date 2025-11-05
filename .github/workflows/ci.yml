@@ -25,4 +25,4 @@ jobs:
 
       - name: Run Tests (pytest)
         run: |
-          pytest -v || echo "Pytest completed"
+          python -m pytest -v || echo "Pytest completed"

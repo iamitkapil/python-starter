@@ -3,7 +3,7 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:  # manual trigger also possible
+  workflow_dispatch: 
 
 jobs:
   ai-review:
@@ -39,38 +39,47 @@ jobs:
 
       - name: Run AI Review on Changed Files
         id: review
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p ai_reviews
+          # Create output folder
+          New-Item -ItemType Directory -Force -Path ai_reviews | Out-Null
 
-          while IFS= read -r FILE
-          do
-            if [ -f "$FILE" ]; then
-              
-              # Escape double-quotes so JSON is valid
-              CONTENT=$(sed 's/"/\\"/g' "$FILE")
+          Get-Content changed_files.txt | ForEach-Object {
+              $FILE = $_.Trim()
+              if (Test-Path $FILE) {
 
-              PAYLOAD="{\"code\":\"$CONTENT\",\"file_path\":\"$FILE\",\"language\":\"python\"}"
+                  Write-Host "Sending $FILE to AI agent..."
 
-              echo "🔍 Sending $FILE to AI agent..."
+                  # Escape quotes for JSON
+                  $CONTENT = Get-Content $FILE -Raw | ForEach-Object { $_ -replace '"', '\"' }
 
-              RESPONSE=$(curl -s -X POST http://localhost:8000/api/review/code \
-                -H "Content-Type: application/json" \
-                -d "$PAYLOAD")
+                  # Build JSON payload
+                  $PAYLOAD = @{
+                      code = $CONTENT
+                      file_path = $FILE
+                      language = "python"
+                  } | ConvertTo-Json -Compress
 
-              # Save response
-              OUTFILE="ai_reviews/$(basename $FILE).json"
-              echo "$RESPONSE" > "$OUTFILE"
+                  # Call AI agent API
+                  $RESPONSE = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" `
+                      -Method POST `
+                      -ContentType "application/json" `
+                      -Body $PAYLOAD
 
-              echo "✅ AI Review for $FILE saved to $OUTFILE"
-            fi
-          done < changed_files.txt
+                  # Save response
+                  $OUTFILE = "ai_reviews/$([System.IO.Path]::GetFileName($FILE)).json"
+                  $RESPONSE | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8 $OUTFILE
+
+                  Write-Host "AI Review for $FILE saved to $OUTFILE"
+              }
+          }
+
 
       - name: Combine AI Results
         id: combine
         shell: bash
         run: |
-          echo "### 🤖 AI Code Review Results" > feedback.md
+          echo "### AI Code Review Results" > feedback.md
           for f in ai_reviews/*.json; do
             echo "\n**File: $(basename $f)**" >> feedback.md
             cat $f >> feedback.md

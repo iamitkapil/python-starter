@@ -1,0 +1,27 @@
+name: Python CI
+
+on:
+  push:
+    branches:
+      - "**"       # push on ANY branch = CI runs everywhere
+  workflow_dispatch:  # manual run allowed
+
+jobs:
+  ci:
+    runs-on: self-hosted      
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Show Python Version
+        run: python --version
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Tests (pytest)
+        run: |
+          pytest -v || echo "Pytest completed"

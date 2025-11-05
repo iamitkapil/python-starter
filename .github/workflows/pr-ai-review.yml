@@ -94,3 +94,47 @@ jobs:
           # Set step output (optional)
           Add-Content -Path $env:GITHUB_OUTPUT -Value "done=true"
 
+      - name: Post AI Feedback as PR Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'feedback.md';
+
+            if (!fs.existsSync(path)) {
+              core.warning('feedback.md not found, skipping comment.');
+              return;
+            }
+
+            const body = fs.readFileSync(path, 'utf8');
+
+            // Create or update comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            // Look for existing AI feedback comment
+            const existing = comments.find(c => c.user.login === 'github-actions[bot]' && c.body.startsWith('### AI Code Review Results'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body
+              });
+              core.info('✅ Updated existing AI feedback comment');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+              core.info('✅ Posted new AI feedback comment');
+            }
+
+

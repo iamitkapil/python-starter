@@ -80,24 +80,58 @@ jobs:
           }
 
 
-      - name: Combine AI Results
+      - name: Combine AI Results (Formatted Markdown)
         id: combine
         shell: pwsh
         run: |
-          # Create feedback file header
-          "### AI Code Review Results" | Out-File -Encoding utf8 feedback.md
+          $output = @()
+          $output += "###  AI Code Review Results`n"
 
-          # Collect all AI review JSONs
-          Get-ChildItem -Path "ai_reviews" -Filter "*.json" | ForEach-Object {
-              $file = $_.FullName
-              Add-Content -Path feedback.md -Value ""
-              Add-Content -Path feedback.md -Value "**File: $($_.Name)**"
-              Add-Content -Path feedback.md -Value (Get-Content $file -Raw)
-              Add-Content -Path feedback.md -Value "`n---`n"
+          $files = Get-ChildItem -Path "ai_reviews" -Filter "*.json"
+          $hasIssues = $false
+
+          foreach ($file in $files) {
+            $data = Get-Content $file.FullName | ConvertFrom-Json
+            $filename = $file.BaseName
+            $metrics = $data.data.metrics
+
+            $output += "####  File: `$filename`"
+            $output += "| Metric | Value |"
+            $output += "|--------|-------:|"
+            $output += "| Cyclomatic Complexity | $($metrics.complexity_metrics.cyclomatic_complexity) |"
+            $output += "| Average Complexity | $($metrics.complexity_metrics.average_complexity) |"
+            $output += "| Max Complexity | $($metrics.complexity_metrics.max_complexity) |"
+            $output += "| Function Count | $($metrics.complexity_metrics.function_count) |"
+            $output += "| Lines of Code | $($metrics.complexity_metrics.lines_of_code) |"
+            $output += "| Maintainability Index | $([math]::Round($metrics.maintainability_metrics.maintainability_index,2)) |"
+            $output += "| Readability Score | $([math]::Round($metrics.maintainability_metrics.readability_score,2)) |"
+            $output += "| Testability Score | $($metrics.maintainability_metrics.testability_score) |"
+            $output += "| Overall Score | $($data.data.overall_score) |`n"
+
+            if ($metrics.security_issues -and $metrics.security_issues.Count -gt 0) {
+              $hasIssues = $true
+              $output += "**Security Issues:**"
+              $output += "| Type | Severity | Message | Line |"
+              $output += "|------|-----------|----------|------|"
+              foreach ($issue in $metrics.security_issues) {
+                $output += "| $($issue.type) | $($issue.severity) | $($issue.message) | $($issue.line) |"
+              }
+            } else {
+              $output += "**Security Issues:**`n> _None detected._"
+            }
+
+            $output += "`n---`n"
           }
 
-          # Set step output (optional)
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "done=true"
+          # Add summary section
+          if ($hasIssues) {
+            $summary = "###  Summary: Security issues detected in one or more files."
+          } else {
+            $summary = "###  Summary: No security issues found."
+          }
+
+          ($summary, "`n", ($output -join "`n")) | Out-File -Encoding utf8 feedback.md
+
 
       - name: Post AI Feedback as PR Comment
         if: github.event_name == 'pull_request'
@@ -131,7 +165,7 @@ jobs:
                 comment_id: existing.id,
                 body: body
               });
-              core.info('✅ Updated existing AI feedback comment');
+              core.info('Updated existing AI feedback comment');
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -139,7 +173,7 @@ jobs:
                 issue_number: context.issue.number,
                 body: body
               });
-              core.info('✅ Posted new AI feedback comment');
+              core.info('Posted new AI feedback comment');
             }
 
 

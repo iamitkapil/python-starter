@@ -95,26 +95,26 @@ jobs:
             $filename = $file.BaseName
             $metrics = $data.data.metrics
 
-            $output += "####  File: `$filename`"
-            $output += "| Metric | Value |"
-            $output += "|--------|-------:|"
-            $output += "| Cyclomatic Complexity | $($metrics.complexity_metrics.cyclomatic_complexity) |"
-            $output += "| Average Complexity | $($metrics.complexity_metrics.average_complexity) |"
-            $output += "| Max Complexity | $($metrics.complexity_metrics.max_complexity) |"
-            $output += "| Function Count | $($metrics.complexity_metrics.function_count) |"
-            $output += "| Lines of Code | $($metrics.complexity_metrics.lines_of_code) |"
-            $output += "| Maintainability Index | $([math]::Round($metrics.maintainability_metrics.maintainability_index,2)) |"
-            $output += "| Readability Score | $([math]::Round($metrics.maintainability_metrics.readability_score,2)) |"
-            $output += "| Testability Score | $($metrics.maintainability_metrics.testability_score) |"
-            $output += "| Overall Score | $($data.data.overall_score) |`n"
+            $output += "####  File: `$filename"
+            $output += "`n| Metric | Value |"
+            $output += "`n|--------|-------:|"
+            $output += "`n| Cyclomatic Complexity | $($metrics.complexity_metrics.cyclomatic_complexity) |"
+            $output += "`n| Average Complexity | $($metrics.complexity_metrics.average_complexity) |"
+            $output += "`n| Max Complexity | $($metrics.complexity_metrics.max_complexity) |"
+            $output += "`n| Function Count | $($metrics.complexity_metrics.function_count) |"
+            $output += "`n| Lines of Code | $($metrics.complexity_metrics.lines_of_code) |"
+            $output += "`n| Maintainability Index | $([math]::Round($metrics.maintainability_metrics.maintainability_index,2)) |"
+            $output += "`n| Readability Score | $([math]::Round($metrics.maintainability_metrics.readability_score,2)) |"
+            $output += "`n| Testability Score | $($metrics.maintainability_metrics.testability_score) |"
+            $output += "`n| Overall Score | $($data.data.overall_score) |`n"
 
             if ($metrics.security_issues -and $metrics.security_issues.Count -gt 0) {
               $hasIssues = $true
               $output += "**Security Issues:**"
-              $output += "| Type | Severity | Message | Line |"
-              $output += "|------|-----------|----------|------|"
+              $output += "`n| Type | Severity | Message | Line |"
+              $output += "`n|------|-----------|----------|------|"
               foreach ($issue in $metrics.security_issues) {
-                $output += "| $($issue.type) | $($issue.severity) | $($issue.message) | $($issue.line) |"
+                $output += "`n| $($issue.type) | $($issue.severity) | $($issue.message) | $($issue.line) |"
               }
             } else {
               $output += "**Security Issues:**`n> _None detected._"
@@ -131,6 +131,7 @@ jobs:
           }
 
           ($summary, "`n", ($output -join "`n")) | Out-File -Encoding utf8 feedback.md
+
 
 
       - name: Post AI Feedback as PR Comment

@@ -26,7 +26,9 @@ jobs:
         run: |
           git fetch origin $env:BASE_REF
 
-          $changed = git diff --name-only origin/$env:BASE_REF -- '*.py'
+          $changed = git diff --name-only --ignore-none origin/$env:BASE_REF -- '*.py'
+
+
           Write-Host "Changed Python files:"
           $changed
 

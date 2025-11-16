@@ -1,6 +1,5 @@
 
-# TEMP CHANGE: forcing PR update
-# This ensures AI workflow runs and posts comment
+# TEMP CHANGE to test PR trigger
 def run_expression_vulnerable(expr: str):
     """
     VULNERABLE: evaluating arbitrary expressions supplied by users.

@@ -56,7 +56,7 @@ jobs:
                   Write-Host "Sending $FILE to AI agent..."
 
                   # Escape quotes for JSON
-                  $CONTENT = Get-Content $FILE -Raw | ForEach-Object { $_ -replace '"', '\"' }
+                  $CONTENT = Get-Content $FILE -Raw
 
                   # Build JSON payload
                   $PAYLOAD = @{

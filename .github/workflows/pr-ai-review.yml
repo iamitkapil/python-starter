@@ -40,50 +40,45 @@ jobs:
           Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<EOF"
           Add-Content -Path $env:GITHUB_OUTPUT -Value $changed
           Add-Content -Path $env:GITHUB_OUTPUT -Value "EOF"
+          
 
       - name: Run AI Review on Changed Files
         id: review
         shell: pwsh
         run: |
+          # Create output folder
           New-Item -ItemType Directory -Force -Path ai_reviews | Out-Null
-
-          if (-not (Test-Path "changed_files.txt")) {
-            Write-Host "changed_files.txt not found, skipping."
-            exit 0
-          }
 
           Get-Content changed_files.txt | ForEach-Object {
               $FILE = $_.Trim()
-              if ([string]::IsNullOrWhiteSpace($FILE)) { continue }
-
               if (Test-Path $FILE) {
+
                   Write-Host "Sending $FILE to AI agent..."
 
-                  $CONTENT = Get-Content $FILE -Raw
+                  # Escape quotes for JSON
+                  $CONTENT = Get-Content $FILE -Raw | ForEach-Object { $_ -replace '"', '\"' }
 
+                  # Build JSON payload
                   $PAYLOAD = @{
-                      code      = $CONTENT
+                      code = $CONTENT
                       file_path = $FILE
-                      language  = "python"
+                      language = "python"
                   } | ConvertTo-Json -Compress
 
-                  try {
-                      $RESPONSE = Invoke-RestMethod `
-                        -Uri "http://localhost:8000/api/review/code" `
-                        -Method POST `
-                        -ContentType "application/json" `
-                        -Body $PAYLOAD
+                  # Call AI agent API
+                  $RESPONSE = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" `
+                      -Method POST `
+                      -ContentType "application/json" `
+                      -Body $PAYLOAD
 
-                      $OUTFILE = "ai_reviews/$([System.IO.Path]::GetFileName($FILE)).json"
-                      $RESPONSE | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8 $OUTFILE
+                  # Save response
+                  $OUTFILE = "ai_reviews/$([System.IO.Path]::GetFileName($FILE)).json"
+                  $RESPONSE | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8 $OUTFILE
 
-                      Write-Host "AI Review saved → $OUTFILE"
-                  }
-                  catch {
-                      Write-Warning "AI agent failed for $FILE → $_"
-                  }
+                  Write-Host "AI Review for $FILE saved to $OUTFILE"
               }
           }
+
 
       # ⭐⭐⭐ NEW ENTERPRISE COMBINE STEP ⭐⭐⭐
       - name: Combine AI Results (Enterprise Markdown Report)

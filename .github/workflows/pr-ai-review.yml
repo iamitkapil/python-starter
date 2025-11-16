@@ -22,15 +22,16 @@ jobs:
         id: detect
         shell: pwsh
         env:
-          BASE_REF: ${{ github.base_ref || 'main' }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+
         run: |
-          git fetch origin $env:BASE_REF
+          Write-Host "Base branch: $env:BASE_REF"
+
+          git fetch origin $env:BASE_REF --depth=0
 
           $changed = git diff --raw origin/$env:BASE_REF -- '*.py' |
               ForEach-Object { ($_ -split '\s+')[5] } |
               Sort-Object -Unique
-
-
 
           Write-Host "Changed Python files:"
           $changed

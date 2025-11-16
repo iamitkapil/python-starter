@@ -22,22 +22,21 @@ jobs:
         id: detect
         shell: pwsh
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-
+          BASE_REF: ${{ github.base_ref || 'main' }}
         run: |
-          Write-Host "Base branch: $env:BASE_REF"
+          # Fetch the base branch from origin
+          git fetch origin $env:BASE_REF
 
-          git fetch origin $env:BASE_REF --depth=0
+          # Get changed python files between base and HEAD
+          $changed = git diff --name-only origin/$env:BASE_REF -- '*.py'
 
-          $changed = git diff --raw origin/$env:BASE_REF -- '*.py' |
-              ForEach-Object { ($_ -split '\s+')[5] } |
-              Sort-Object -Unique
+          Write-Output "Changed files:"
+          Write-Output $changed
 
-          Write-Host "Changed Python files:"
-          $changed
-
+          # Write changed files to a file
           $changed | Out-File -Encoding utf8 changed_files.txt
 
+          # Set output variable 'files' for next steps
           Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<EOF"
           Add-Content -Path $env:GITHUB_OUTPUT -Value $changed
           Add-Content -Path $env:GITHUB_OUTPUT -Value "EOF"

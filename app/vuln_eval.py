@@ -1,4 +1,6 @@
-# vuln_eval.py
+
+# TEMP CHANGE: forcing PR update
+# This ensures AI workflow runs and posts comment
 def run_expression_vulnerable(expr: str):
     """
     VULNERABLE: evaluating arbitrary expressions supplied by users.

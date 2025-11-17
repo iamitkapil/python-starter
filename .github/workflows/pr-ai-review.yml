@@ -59,11 +59,11 @@ jobs:
                   $CONTENT = Get-Content $FILE -Raw
 
                   # Build JSON payload
-                  $PAYLOAD = @{
+                  $PAYLOAD = [ordered]@{
                       code = $CONTENT
                       file_path = $FILE
-                      language = "python"
-                  } | ConvertTo-Json -Compress
+                      language = 'python'
+                  } | ConvertTo-Json -Depth 10
 
                   # Call AI agent API
                   $RESPONSE = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" `

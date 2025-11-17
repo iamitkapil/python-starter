@@ -79,8 +79,7 @@ jobs:
               }
           }
 
-
-      # ⭐⭐⭐ NEW ENTERPRISE COMBINE STEP ⭐⭐⭐
+      # ⭐ NEW ENTERPRISE COMBINE STEP ⭐
       - name: Combine AI Results (Enterprise Markdown Report)
         id: combine
         shell: pwsh
@@ -96,20 +95,39 @@ jobs:
           $securityIssueCount = 0
           $complexityFails = 0
           $maintFails = 0
+          $aiCriticalIssues = 0
 
           $maxComplexity = 10
           $minMaintainability = 60
 
           $securityTable = ""
+          $aiTable = ""
 
           foreach ($f in $files) {
             $json = Get-Content $f.FullName -Raw | ConvertFrom-Json
-            $metrics = $json.data.metrics
 
+            # STATIC METRICS
+            $metrics = $json.data.metrics
             $complexity = $metrics.complexity_metrics.cyclomatic_complexity
             $maint = $metrics.maintainability_metrics.maintainability_index
             $secIssues = $metrics.security_issues
 
+            # AI METRICS
+            $aiIssues = $json.data.issues
+            $optim = $json.data.optimization_suggestions
+            $overallScore = $json.data.overall_score
+
+            # COUNT AI critical
+            if ($aiIssues) {
+              foreach ($ai in $aiIssues) {
+                if ($ai.severity -in @("high","critical")) {
+                  $aiCriticalIssues++
+                  $aiTable += "| $($ai.category) | $($ai.severity) | $($ai.message) | $($ai.line_number) |\n"
+                }
+              }
+            }
+
+            # STATIC SECURITY
             if ($secIssues -and $secIssues.Count -gt 0) {
               $securityIssueCount += 1
 
@@ -126,6 +144,7 @@ jobs:
               }
             }
 
+            # FAIL checks
             if ($complexity -gt $maxComplexity)    { $complexityFails++ }
             if ($maint -lt $minMaintainability)    { $maintFails++ }
           }
@@ -135,7 +154,8 @@ jobs:
           $md += "# 🧠 AI Code Review Results"
           $md += ""
           $md += "## 🔍 Summary"
-          $md += "- **$securityIssueCount files with security issues**"
+          $md += "- **$securityIssueCount files with STATIC security issues**"
+          $md += "- **$aiCriticalIssues AI-detected high/critical issues**"
           $md += "- **$complexityFails files failed complexity threshold**"
           $md += "- **$maintFails files with low maintainability**"
           $md += "- **$totalFiles total files analyzed**"
@@ -143,9 +163,21 @@ jobs:
           $md += "---"
           $md += ""
 
-          # --- SECURITY TABLE ---
+          # --- AI ISSUES TABLE ---
+          if ($aiCriticalIssues -gt 0) {
+            $md += "## 🤖 AI-Detected Critical Issues"
+            $md += ""
+            $md += "| Category | Severity | Message | Line |"
+            $md += "|----------|----------|---------|------|"
+            $md += $aiTable.TrimEnd()
+            $md += ""
+            $md += "---"
+            $md += ""
+          }
+
+          # --- STATIC SECURITY TABLE ---
           if ($securityIssueCount -gt 0) {
-            $md += "## 🛡️ Security Issues"
+            $md += "## 🛡️ Static Security Issues"
             $md += ""
             $md += "| Type | Severity | Message | Line |"
             $md += "|------|----------|---------|------|"
@@ -161,6 +193,9 @@ jobs:
           $md += "| Check | Status |"
           $md += "|--------|--------|"
 
+          if ($aiCriticalIssues -gt 0) { $md += "| AI Review | 🔴 FAIL |" }
+          else                         { $md += "| AI Review | 🟢 PASS |" }
+
           if ($securityIssueCount -gt 0) { $md += "| Security | 🔴 FAIL |" }
           else                           { $md += "| Security | 🟢 PASS |" }
 
@@ -173,6 +208,7 @@ jobs:
           $md += ""
 
           $md | Out-File -Encoding utf8 feedback.md
+
 
       - name: Post AI Feedback as PR Comment
         if: github.event_name == 'pull_request'

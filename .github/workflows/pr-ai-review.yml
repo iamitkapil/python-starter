@@ -22,7 +22,7 @@ jobs:
         id: detect
         shell: pwsh
         env:
-          BASE_REF: ${{ github.base_ref || 'main' }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           # Fetch the base branch from origin
           git fetch origin $env:BASE_REF
@@ -59,11 +59,13 @@ jobs:
                   $CONTENT = Get-Content $FILE -Raw
 
                   # Build JSON payload
+                  $ESCAPED = $CONTENT.Replace("\", "\\")
                   $PAYLOAD = [ordered]@{
-                      code = $CONTENT
-                      file_path = $FILE
-                      language = 'python'
+                    code = $ESCAPED
+                    file_path = $FILE
+                    language = 'python'
                   } | ConvertTo-Json -Depth 10
+
 
                   # Call AI agent API
                   $RESPONSE = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" `

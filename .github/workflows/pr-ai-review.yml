@@ -209,6 +209,11 @@ jobs:
 
           $md | Out-File -Encoding utf8 feedback.md
 
+      - name: Upload AI Review JSON as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review-json
+          path: ai_reviews/*.json
 
       - name: Post AI Feedback as PR Comment
         if: github.event_name == 'pull_request'

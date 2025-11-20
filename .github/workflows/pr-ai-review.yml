@@ -190,20 +190,20 @@ jobs:
           # --- QUALITY GATES ---
           $md += "## 🚦 Quality Gate Status"
           $md += ""
-          $md += "| Check | Status |"
-          $md += "|--------|--------|"
+          $md += "| Check | Status | Metric |"
+          $md += "|--------|--------|--------|"
+          
+          if ($aiCriticalIssues -gt 0) { $md += "| AI Review | 🔴 FAIL | $aiCriticalIssues critical issues |" }
+          else                         { $md += "| AI Review | 🟢 PASS | 0 critical issues |" }
 
-          if ($aiCriticalIssues -gt 0) { $md += "| AI Review | 🔴 FAIL |" }
-          else                         { $md += "| AI Review | 🟢 PASS |" }
+          if ($securityIssueCount -gt 0) { $md += "| Security | 🔴 FAIL | $securityIssueCount static issues |" }
+          else                           { $md += "| Security | 🟢 PASS | 0 static issues |" }
 
-          if ($securityIssueCount -gt 0) { $md += "| Security | 🔴 FAIL |" }
-          else                           { $md += "| Security | 🟢 PASS |" }
+          if ($complexityFails -gt 0)    { $md += "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" }
+          else                           { $md += "| Complexity | 🟢 PASS | Within $maxComplexity limit" }
 
-          if ($complexityFails -gt 0)    { $md += "| Complexity | 🔴 FAIL |" }
-          else                           { $md += "| Complexity | 🟢 PASS |" }
-
-          if ($maintFails -gt 0)         { $md += "| Maintainability | 🔴 FAIL |" }
-          else                           { $md += "| Maintainability | 🟢 PASS |" }
+          if ($maintFails -gt 0)         { $md += "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" }
+          else                           { $md += "| Maintainability | 🟢 PASS | Above $minMaintainability" }
 
           $md += ""
 

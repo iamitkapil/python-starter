@@ -142,15 +142,18 @@ jobs:
                   default    { $issue.severity }
                 }
 
-                # Fix for missing message
+                # FIX: Support multiple message field names
                 $message = $issue.message
-                if (-not $message -or $message.Trim() -eq "") { 
-                    $message = "(no message provided)" 
-                }
 
-                # Fix for missing line
+                if (-not $message) { $message = $issue.description }
+                if (-not $message) { $message = $issue.details }
+                if (-not $message) { $message = "(no description available)" }
+
+                # FIX: Support "line" or "line_number"
                 $line = $issue.line
+                if (-not $line) { $line = $issue.line_number }
                 if (-not $line) { $line = "-" }
+
 
                 $securityTable += "| $($issue.type) | $sevEmoji | $message | $line |\n"
               }

@@ -142,7 +142,17 @@ jobs:
                   default    { $issue.severity }
                 }
 
-                $securityTable += "| $($issue.type) | $sevEmoji | $($issue.message) | $($issue.line) |\n"
+                # Fix for missing message
+                $message = $issue.message
+                if (-not $message -or $message.Trim() -eq "") { 
+                    $message = "(no message provided)" 
+                }
+
+                # Fix for missing line
+                $line = $issue.line
+                if (-not $line) { $line = "-" }
+
+                $securityTable += "| $($issue.type) | $sevEmoji | $message | $line |\n"
               }
             }
 

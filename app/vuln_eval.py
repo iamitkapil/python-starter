@@ -19,5 +19,5 @@ def run_expression_secure(expr: str):
 
 
 if __name__ == "__main__":
-    print("vuln eval:", run_expression_vulnerable("1 + 2"))
+    print("vulnerable eval:", run_expression_vulnerable("1 + 2"))
     print("secure eval:", run_expression_secure("[1, 2, 3]"))

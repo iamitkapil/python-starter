@@ -155,31 +155,14 @@ jobs:
                 "low"      { "🟢 Low" }
                 default    { $severity }
               }
-
-              # FIX: normalize fields completely
-              $issueFile = if ([string]::IsNullOrWhiteSpace($issue.file_path)) {
-                $filePathTop
-              } else {
-                $issue.file_path
-              }
-
-              $category = if ([string]::IsNullOrWhiteSpace($issue.category)) {
-                "general"
-              } else {
-                $issue.category
-              }
-
-              # PIPE FIX FOR AI MESSAGES
-              $msg = if ([string]::IsNullOrWhiteSpace($issue.message)) {
-                "(no message)"
-              } else {
-                ($issue.message -replace '\|', '&#124;')
-              }
+              # ESCAPE CHARACTERS TO PREVENT TABLE BREAK
+              $msg = ($issue.message ?? "(no message)") -replace "\|", "\`|"
+              $category = ($issue.category ?? "general") -replace "\|", "\`|"
+              $issueFile = ($issue.file_path ?? $filePathTop) -replace "\|", "\`|"
 
               $line = $issue.line_number ?? "-"
 
               $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
-            }
           }
 
           # BUILD MARKDOWN
@@ -195,7 +178,7 @@ jobs:
           $md += "---"
 
           if ($aiCritical -gt 0) {
-            $md += "## 🤖 AI-Detected Critical Issues"
+            $md += "## 🤖 AI-Detected Issues"
             $md += "| File | Category | Severity | Message | Line |"
             $md += "|------|----------|----------|---------|------|"
             $md += $aiRows.TrimEnd()

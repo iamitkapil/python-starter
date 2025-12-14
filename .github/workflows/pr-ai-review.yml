@@ -75,16 +75,14 @@ jobs:
           }
 
       # ---------------------------------------
-      # ENTERPRISE MARKDOWN REPORT
+      # ENTERPRISE MARKDOWN REPORT (FIXED)
       # ---------------------------------------
       - name: Enterprise Markdown Report
         id: combine
         shell: pwsh
         run: |
-
           function Escape-Markdown($text) {
               if (-not $text) { return "" }
-
               $text = $text -replace '\|', '&#124;'
               $text = $text -replace '\[', '&#91;'
               $text = $text -replace '\]', '&#93;'
@@ -94,9 +92,9 @@ jobs:
               $text = $text -replace '`', '&#96;'
               $text = $text -replace '"', '&quot;'
               $text = $text -replace "'", '&#39;'
-
               return $text
           }
+
           $files = Get-ChildItem "ai_reviews" -Filter "*.json"
 
           if (-not $files) {
@@ -153,7 +151,7 @@ jobs:
               $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
             }
 
-            # AI ISSUES
+            # AI ISSUES (FIX → ENSURE ALL ISSUES ARE LISTED)
             $aiIssues = $json.data.issues
 
             foreach ($issue in $aiIssues) {
@@ -179,7 +177,7 @@ jobs:
               $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
             }
 
-          }   # <<<<<<<< THIS WAS THE MISSING BRACE (CRITICAL FIX)
+          }  # ← THIS BRACE WAS MISSING BEFORE (NOW FIXED)
 
           # BUILD MARKDOWN
           $md = @()
@@ -193,7 +191,7 @@ jobs:
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
-          # ALWAYS SHOW FULL LIST
+          # ALWAYS SHOW FULL AI LIST
           $md += "## 🤖 AI-Detected Issues"
           $md += "| File | Category | Severity | Message | Line |"
           $md += "|------|----------|----------|---------|------|"
@@ -266,17 +264,16 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: existing.id,
-                body: content,   // ← DON'T CALL AS FUNCTION
+                body: content,
               });
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: content,   // ← CORRECT
+                body: content,
               });
             }
-
 
       # ---------------------------------------
       # COMMIT STATUS

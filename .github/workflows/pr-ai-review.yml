@@ -83,20 +83,20 @@ jobs:
         run: |
 
           function Escape-Markdown($text) {
-            if (-not $text) { return "" }
-            return $text `
-              -replace '\|', '&#124;' `
-              -replace '\[', '&#91;' `
-              -replace '\]', '&#93;' `
-              -replace '\{', '&#123;' `
-              -replace '\}', '&#125;' `
-              -replace '\*', '&#42;' `
-              -replace '\_', '&#95;' `
-              -replace '\`', '&#96;' `
-              -replace '"', '&quot;' `
-              -replace "'", '&#39;'
-          }
+              if (-not $text) { return "" }
 
+              $text = $text -replace '\|', '&#124;'
+              $text = $text -replace '\[', '&#91;'
+              $text = $text -replace '\]', '&#93;'
+              $text = $text -replace '\{', '&#123;'
+              $text = $text -replace '\}', '&#125;'
+              $text = $text -replace '\*', '&#42;'
+              $text = $text -replace '`', '&#96;'
+              $text = $text -replace '"', '&quot;'
+              $text = $text -replace "'", '&#39;'
+
+              return $text
+          }
           $files = Get-ChildItem "ai_reviews" -Filter "*.json"
 
           if (-not $files) {

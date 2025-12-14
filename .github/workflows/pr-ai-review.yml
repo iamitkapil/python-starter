@@ -122,29 +122,55 @@ jobs:
             # ------------------------
             $aiIssues = $json.data.issues
 
+            # ENTERPRISE AI ISSUE TABLE (Group by file, sort, color)
             if ($aiIssues) {
+
+              # Convert to sortable structure
+              $normalizedIssues = @()
+
               foreach ($ai in $aiIssues) {
-                if ($ai.severity -in @("high","critical")) {
 
-                  # SAFE DEFAULTS
-                  $cat = $ai.category
-                  if (-not $cat) { $cat = "unknown" }
-
-                  $sev = $ai.severity
-                  if (-not $sev) { $sev = "high" }
-
-                  $msg = $ai.message
-                  if (-not $msg) { $msg = "(no message provided)" }
-
-                  $line = $ai.line_number
-                  if (-not $line) { $line = "-" }
-
-                  # Add to table
-                  $aiCriticalIssues++
-                  $aiTable += "| $cat | $sev | $msg | $line |\n"
+                $normalizedIssues += [PSCustomObject]@{
+                  File      = $json.data.file_path
+                  Category  = $ai.category       ?? "unknown"
+                  Severity  = $ai.severity       ?? "high"
+                  Message   = $ai.message        ?? "(no message provided)"
+                  Line      = $ai.line_number    ?? "-"
                 }
               }
+
+              # SORT: critical > high > medium > low
+              $severityOrder = @{
+                "critical" = 1
+                "high"     = 2
+                "medium"   = 3
+                "low"      = 4
+              }
+
+              $sorted = $normalizedIssues |
+                Sort-Object { $severityOrder[$_.Severity] }, File, Line
+
+              foreach ($issue in $sorted) {
+
+                # Count high/critical
+                if ($issue.Severity -in @("critical","high")) {
+                  $aiCriticalIssues++
+                }
+
+                # Emoji coloring
+                $sevEmoji = switch ($issue.Severity) {
+                  "critical" { "🛑 Critical" }
+                  "high"     { "🔴 High" }
+                  "medium"   { "🟡 Medium" }
+                  "low"      { "🟢 Low" }
+                  default    { $issue.Severity }
+                }
+
+                # Table row
+                $aiTable += "| $($issue.File) | $($issue.Category) | $sevEmoji | $($issue.Message) | $($issue.Line) |\n"
+              }
             }
+
 
             # ------------------------
             # STATIC SECURITY

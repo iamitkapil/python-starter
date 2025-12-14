@@ -123,52 +123,50 @@ jobs:
             $aiIssues = $json.data.issues
 
             # ENTERPRISE AI ISSUE TABLE (Group by file, sort, color)
+            # ENTERPRISE AI ISSUE TABLE (PER-FILE)
             if ($aiIssues) {
 
-              # Convert to sortable structure
-              $normalizedIssues = @()
+                $normalizedIssues = @()
 
-              foreach ($ai in $aiIssues) {
-
-                $normalizedIssues += [PSCustomObject]@{
-                  File      = $json.data.file_path
-                  Category  = $ai.category       ?? "unknown"
-                  Severity  = $ai.severity       ?? "high"
-                  Message   = $ai.message        ?? "(no message provided)"
-                  Line      = $ai.line_number    ?? "-"
-                }
-              }
-
-              # SORT: critical > high > medium > low
-              $severityOrder = @{
-                "critical" = 1
-                "high"     = 2
-                "medium"   = 3
-                "low"      = 4
-              }
-
-              $sorted = $normalizedIssues |
-                Sort-Object { $severityOrder[$_.Severity] }, File, Line
-
-              foreach ($issue in $sorted) {
-
-                # Count high/critical
-                if ($issue.Severity -in @("critical","high")) {
-                  $aiCriticalIssues++
+                foreach ($ai in $aiIssues) {
+                    $normalizedIssues += [PSCustomObject]@{
+                        File     = $json.data.file_path
+                        Category = $ai.category       ?? "unknown"
+                        Severity = $ai.severity       ?? "high"
+                        Message  = $ai.message        ?? "(no message provided)"
+                        Line     = $ai.line_number    ?? "-"
+                    }
                 }
 
-                # Emoji coloring
-                $sevEmoji = switch ($issue.Severity) {
-                  "critical" { "🛑 Critical" }
-                  "high"     { "🔴 High" }
-                  "medium"   { "🟡 Medium" }
-                  "low"      { "🟢 Low" }
-                  default    { $issue.Severity }
+                # SORT BY SEVERITY
+                $severityOrder = @{
+                    "critical" = 1
+                    "high"     = 2
+                    "medium"   = 3
+                    "low"      = 4
                 }
 
-                # Table row
-                $aiTable += "| $($issue.File) | $($issue.Category) | $sevEmoji | $($issue.Message) | $($issue.Line) |\n"
-              }
+                $sorted = $normalizedIssues |
+                    Sort-Object { $severityOrder[$_.Severity] }, File, Line
+
+                foreach ($issue in $sorted) {
+
+                    # Count critical/high
+                    if ($issue.Severity -in @("critical","high")) {
+                        $aiCriticalIssues++
+                    }
+
+                    $sevEmoji = switch ($issue.Severity) {
+                        "critical" { "🛑 Critical" }
+                        "high"     { "🔴 High" }
+                        "medium"   { "🟡 Medium" }
+                        "low"      { "🟢 Low" }
+                        default    { $issue.Severity }
+                    }
+
+                    # ENTERPRISE ROW FORMAT
+                    $aiTable += "| $($issue.File) | $($issue.Category) | $sevEmoji | $($issue.Message) | $($issue.Line) |\n"
+                }
             }
 
 

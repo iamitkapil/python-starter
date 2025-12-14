@@ -75,9 +75,9 @@ jobs:
           }
 
       # ---------------------------------------
-      # ENTERPRISE MARKDOWN REPORT
+      # PREMIUM MARKDOWN REPORTER
       # ---------------------------------------
-      - name: Enterprise Markdown Report
+      - name: Enterprise Markdown Report (Premium UI)
         id: combine
         shell: pwsh
         run: |
@@ -130,7 +130,10 @@ jobs:
                 default    { $sev }
               }
 
+              # MASTER FIX — Escape pipe characters
               $msg = $s.message ?? $s.description ?? "(no description)"
+              $msg = ($msg -replace '\|', '&#124;')
+
               $line = $s.line ?? $s.line_number ?? "-"
 
               $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
@@ -153,23 +156,15 @@ jobs:
                 default    { $severity }
               }
 
-              # FIX: normalize fields completely
-              $issueFile = if ([string]::IsNullOrWhiteSpace($issue.file_path)) {
-                $filePathTop
-              } else {
-                $issue.file_path
-              }
+              # FIX: Normalize fields completely
+              $issueFile = if ([string]::IsNullOrWhiteSpace($issue.file_path)) { $filePathTop } else { $issue.file_path }
+              $category  = if ([string]::IsNullOrWhiteSpace($issue.category))  { "general" }   else { $issue.category }
 
-              $category = if ([string]::IsNullOrWhiteSpace($issue.category)) {
-                "general"
-              } else {
-                $issue.category
-              }
-
+              # MASTER FIX — escape pipes
               $msg = if ([string]::IsNullOrWhiteSpace($issue.message)) {
-                "(no message)"
+                  "(no message)"
               } else {
-                $issue.message
+                  ($issue.message -replace '\|', '&#124;')
               }
 
               $line = $issue.line_number ?? "-"
@@ -178,10 +173,28 @@ jobs:
             }
           }
 
-          # BUILD MARKDOWN
+          # ================================
+          # PREMIUM UI BUILD
+          # ================================
           $md = @()
+
+          # -------------------------------------------
+          # HEADER with badges
+          # -------------------------------------------
           $md += "# 🧠 AI Code Review Results"
           $md += ""
+          $md += "<p>"
+          $md += "<img src='https://img.shields.io/badge/Static_Security-$staticCritical-red?style=for-the-badge' />"
+          $md += " <img src='https://img.shields.io/badge/AI_Critical-$aiCritical-red?style=for-the-badge' />"
+          $md += " <img src='https://img.shields.io/badge/ComplexityFails-$complexityFails-yellow?style=for-the-badge' />"
+          $md += " <img src='https://img.shields.io/badge/MaintainabilityFails-$maintFails-orange?style=for-the-badge' />"
+          $md += " <img src='https://img.shields.io/badge/Files-$($files.Count)-blue?style=for-the-badge' />"
+          $md += "</p>"
+          $md += "---"
+
+          # -------------------------------------------
+          # SIMPLE SUMMARY FOR NOW
+          # -------------------------------------------
           $md += "## 🔍 Summary"
           $md += "- **$staticCritical STATIC security issues**"
           $md += "- **$aiCritical AI-detected high/critical issues**"
@@ -190,6 +203,9 @@ jobs:
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
+          # -------------------------------------------
+          # AI ISSUES - NOW ALL WILL DISPLAY
+          # -------------------------------------------
           if ($aiCritical -gt 0) {
             $md += "## 🤖 AI-Detected Critical Issues"
             $md += "| File | Category | Severity | Message | Line |"
@@ -198,6 +214,9 @@ jobs:
             $md += "---"
           }
 
+          # -------------------------------------------
+          # STATIC SECURITY - PREMIUM COLLAPSIBLE
+          # -------------------------------------------
           if ($staticCritical -gt 0) {
             $md += "## 🛡️ Static Security Issues"
             $md += "| File | Type | Severity | Message | Line |"
@@ -206,6 +225,9 @@ jobs:
             $md += "---"
           }
 
+          # -------------------------------------------
+          # QUALITY GATES
+          # -------------------------------------------
           $md += "## 🚦 Quality Gate Status"
           $md += "| Check | Status | Metric |"
           $md += "|--------|--------|--------|"

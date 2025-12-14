@@ -130,7 +130,10 @@ jobs:
                 default    { $sev }
               }
 
+              # PIPE FIX FOR STATIC MESSAGES
               $msg = $s.message ?? $s.description ?? "(no description)"
+              $msg = ($msg -replace '\|', '&#124;')
+
               $line = $s.line ?? $s.line_number ?? "-"
 
               $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
@@ -166,10 +169,11 @@ jobs:
                 $issue.category
               }
 
+              # PIPE FIX FOR AI MESSAGES
               $msg = if ([string]::IsNullOrWhiteSpace($issue.message)) {
                 "(no message)"
               } else {
-                $issue.message
+                ($issue.message -replace '\|', '&#124;')
               }
 
               $line = $issue.line_number ?? "-"

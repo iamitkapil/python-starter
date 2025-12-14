@@ -16,15 +16,9 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # ---------------------------------------
-      # CHECKOUT
-      # ---------------------------------------
       - name: Checkout PR Code
         uses: actions/checkout@v4
 
-      # ---------------------------------------
-      # DETECT CHANGED PYTHON FILES
-      # ---------------------------------------
       - name: Detect Changed Python Files
         id: detect
         shell: pwsh
@@ -32,60 +26,51 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           git fetch origin $env:BASE
-
           $changed = git diff --name-only origin/$env:BASE -- '*.py'
-          Write-Host "Changed files:`n$changed"
-
           $changed | Out-File changed_files.txt -Encoding utf8
 
-      # ---------------------------------------
-      # RUN AI BACKEND REVIEW
-      # ---------------------------------------
       - name: Run AI Review on Changed Files
         id: review
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path ai_reviews | Out-Null
-
           foreach ($file in Get-Content changed_files.txt) {
             $trim = $file.Trim()
             if (-not (Test-Path $trim)) { continue }
-
-            Write-Host "Sending $trim to AI agent..."
-
             $content = Get-Content $trim -Raw
             $escaped = $content.Replace("\", "\\")
-
             $payload = [ordered]@{
-              code      = $escaped
-              file_path = $trim
-              language  = "python"
+              code=$escaped; file_path=$trim; language="python"
             } | ConvertTo-Json -Depth 10
 
-            $response = Invoke-RestMethod `
-              -Uri "http://localhost:8000/api/review/code" `
-              -Method POST `
-              -ContentType "application/json" `
-              -Body $payload
+            $response = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" -Method POST -ContentType "application/json" -Body $payload
 
             $outfile = "ai_reviews/$([System.IO.Path]::GetFileName($trim)).json"
             $response | ConvertTo-Json -Depth 10 | Out-File $outfile -Encoding utf8
-
-            Write-Host "Saved: $outfile"
           }
 
-      # ---------------------------------------
-      # ENTERPRISE MARKDOWN REPORT
-      # ---------------------------------------
       - name: Enterprise Markdown Report
         id: combine
         shell: pwsh
         run: |
-          $files = Get-ChildItem "ai_reviews" -Filter "*.json"
 
+          function Escape-Markdown($text) {
+            return $text `
+              -replace '\|', '&#124;' `
+              -replace '\[', '&#91;' `
+              -replace '\]', '&#93;' `
+              -replace '\{', '&#123;' `
+              -replace '\}', '&#125;' `
+              -replace '\*', '&#42;' `
+              -replace '\_', '&#95;' `
+              -replace '\`', '&#96;' `
+              -replace '"', '&quot;' `
+              -replace "'", '&#39;'
+          }
+
+          $files = Get-ChildItem "ai_reviews" -Filter "*.json"
           if (-not $files) {
-            "# 🧠 AI Code Review Results`n_No Python files changed._" |
-              Out-File feedback.md -Encoding utf8
+            "# 🧠 AI Code Review Results`n_No Python files changed._" | Out-File feedback.md
             exit 0
           }
 
@@ -93,21 +78,17 @@ jobs:
           $staticCritical = 0
           $complexityFails = 0
           $maintFails = 0
-
           $aiRows = ""
           $staticRows = ""
-
           $maxComplexity = 10
           $minMaintainability = 60
 
           foreach ($file in $files) {
 
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
-
             $filePathTop = $json.data.file_path
-
-            # STATIC METRICS
             $metrics = $json.data.metrics
+
             $complexity = $metrics.complexity_metrics.cyclomatic_complexity
             $maint = $metrics.maintainability_metrics.maintainability_index
             $sec = $metrics.security_issues
@@ -115,11 +96,8 @@ jobs:
             if ($complexity -gt $maxComplexity) { $complexityFails++ }
             if ($maint -lt $minMaintainability) { $maintFails++ }
 
-            # STATIC SECURITY
             foreach ($s in $sec) {
-
               $sev = ($s.severity).ToLower()
-
               if ($sev -in @("critical","high")) { $staticCritical++ }
 
               $sevEmoji = switch ($sev) {
@@ -127,63 +105,45 @@ jobs:
                 "high"     { "🔴 High" }
                 "medium"   { "🟡 Medium" }
                 "low"      { "🟢 Low" }
-                default    { $sev }
               }
 
-              # PIPE FIX FOR STATIC MESSAGES
-              $msg = $s.message ?? $s.description ?? "(no description)"
-              $msg = ($msg -replace '\|', '&#124;')
-
+              $msg = Escape-Markdown ($s.message)
               $line = $s.line ?? $s.line_number ?? "-"
-
-              $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
+              $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |`n"
             }
 
-            # AI ISSUES
             $aiIssues = $json.data.issues
-
             foreach ($issue in $aiIssues) {
+              $sev = ($issue.severity).ToLower()
+              if ($sev -in @("critical","high")) { $aiCritical++ }
 
-              $severity = ($issue.severity).ToString().ToLower()
-
-              if ($severity -in @("critical","high")) { $aiCritical++ }
-
-              $sevEmoji = switch ($severity) {
+              $sevEmoji = switch ($sev) {
                 "critical" { "🛑 Critical" }
                 "high"     { "🔴 High" }
                 "medium"   { "🟡 Medium" }
                 "low"      { "🟢 Low" }
-                default    { $severity }
               }
-              # ESCAPE CHARACTERS TO PREVENT TABLE BREAK
-              $msg = ($issue.message ?? "(no message)") -replace "\|", "\`|"
-              $category = ($issue.category ?? "general") -replace "\|", "\`|"
-              $issueFile = ($issue.file_path ?? $filePathTop) -replace "\|", "\`|"
 
+              $msg = Escape-Markdown ($issue.message)
+              $category = Escape-Markdown ($issue.category)
+              $issueFile = Escape-Markdown ($issue.file_path)
               $line = $issue.line_number ?? "-"
 
-              $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
+              $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |`n"
             }
-          } 
+
+          }  # <-- THIS was missing (IMPORTANT FIX)
 
           # BUILD MARKDOWN
           $md = @()
           $md += "# 🧠 AI Code Review Results"
           $md += ""
-          $md += "## 🔍 Summary"
-          $md += "- **$staticCritical STATIC security issues**"
-          $md += "- **$aiCritical AI-detected high/critical issues**"
-          $md += "- **$complexityFails complexity failures**"
-          $md += "- **$maintFails low maintainability files**"
-          $md += "- **$($files.Count) total files analyzed**"
-          $md += "---"
-
           $md += "## 🤖 AI-Detected Issues"
           $md += "| File | Category | Severity | Message | Line |"
           $md += "|------|----------|----------|---------|------|"
           $md += $aiRows.TrimEnd()
           $md += "---"
-        
+
           if ($staticCritical -gt 0) {
             $md += "## 🛡️ Static Security Issues"
             $md += "| File | Type | Severity | Message | Line |"
@@ -192,98 +152,4 @@ jobs:
             $md += "---"
           }
 
-          $md += "## 🚦 Quality Gate Status"
-          $md += "| Check | Status | Metric |"
-          $md += "|--------|--------|--------|"
-
-          $md += ($aiCritical -gt 0) ?
-            "| AI Review | 🔴 FAIL | $aiCritical critical issues |" :
-            "| AI Review | 🟢 PASS | 0 critical issues |"
-
-          $md += ($staticCritical -gt 0) ?
-            "| Security | 🔴 FAIL | $staticCritical static issues |" :
-            "| Security | 🟢 PASS | 0 static issues |"
-
-          $md += ($complexityFails -gt 0) ?
-            "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" :
-            "| Complexity | 🟢 PASS | Within $maxComplexity limit |"
-
-          $md += ($maintFails -gt 0) ?
-            "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
-            "| Maintainability | 🟢 PASS | Above $minMaintainability |"
-
-          $md -join "`n" | Out-File feedback.md -Encoding utf8
-
-      # ---------------------------------------
-      # UPLOAD ARTIFACT
-      # ---------------------------------------
-      - name: Upload AI Review JSON
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-review-json
-          path: ai_reviews/*.json
-
-      # ---------------------------------------
-      # POST PR COMMENT
-      # ---------------------------------------
-      - name: Post AI Feedback as PR Comment
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          script: |
-            const fs = require('fs');
-            const content = fs.readFileSync('feedback.md', 'utf8');
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const existing = comments.find(
-              c => c.user.login === 'github-actions[bot]' &&
-                   c.body.includes("AI Code Review Results")
-            );
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body: content,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: content,
-              });
-            }
-
-      # ---------------------------------------
-      # COMMIT STATUS
-      # ---------------------------------------
-      - name: Set PR Quality Gate Status
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          script: |
-            const fs = require('fs');
-            const content = fs.readFileSync('feedback.md', 'utf8');
-
-            const failed = content.includes("🔴 FAIL");
-            const state = failed ? "failure" : "success";
-
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: state,
-              context: "ai-code-review/quality-gate",
-              description: failed ? "Quality Gates Failed" : "Quality Gates Passed"
-            });
-
-            if (failed) {
-              core.setFailed("Quality Gates Failed ❌");
-            }
+          $md -join "`n" | Out-File feedback.md

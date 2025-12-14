@@ -16,6 +16,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
+
       # ---------------------------------------
       # CHECKOUT
       # ---------------------------------------
@@ -32,10 +33,8 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           git fetch origin $env:BASE
-
           $changed = git diff --name-only origin/$env:BASE -- '*.py'
           Write-Host "Changed files:`n$changed"
-
           $changed | Out-File changed_files.txt -Encoding utf8
 
       # ---------------------------------------
@@ -81,6 +80,38 @@ jobs:
         id: combine
         shell: pwsh
         run: |
+
+          function Escape-Markdown {
+            param([string]$text)
+
+            if (-not $text) { return "" }
+
+            $text = $text -replace "`r`n", "<br>"
+            $text = $text -replace "`n", "<br>"
+            $text = $text -replace "`r", "<br>"
+
+            $replacements = @{
+              "\|"  = "&#124;"
+              "\*"  = "&#42;"
+              "_"   = "&#95;"
+              "\["  = "&#91;"
+              "\]"  = "&#93;"
+              "\{"  = "&#123;"
+              "\}"  = "&#125;"
+              '"'   = "&#34;"
+              "'"   = "&#39;"
+              "\$"  = "&#36;"
+              "#"   = "&#35;"
+              "`"   = "&#96;"
+            }
+
+            foreach ($k in $replacements.Keys) {
+              $text = $text -replace $k, $replacements[$k]
+            }
+
+            return $text
+          }
+
           $files = Get-ChildItem "ai_reviews" -Filter "*.json"
 
           if (-not $files) {
@@ -103,10 +134,9 @@ jobs:
           foreach ($file in $files) {
 
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
-
             $filePathTop = $json.data.file_path
 
-            # STATIC METRICS
+            # ----- STATIC METRICS -----
             $metrics = $json.data.metrics
             $complexity = $metrics.complexity_metrics.cyclomatic_complexity
             $maint = $metrics.maintainability_metrics.maintainability_index
@@ -115,7 +145,7 @@ jobs:
             if ($complexity -gt $maxComplexity) { $complexityFails++ }
             if ($maint -lt $minMaintainability) { $maintFails++ }
 
-            # STATIC SECURITY
+            # ----- STATIC SECURITY -----
             foreach ($s in $sec) {
 
               $sev = ($s.severity).ToLower()
@@ -130,22 +160,18 @@ jobs:
                 default    { $sev }
               }
 
-              # PIPE FIX FOR STATIC MESSAGES
-              $msg = $s.message ?? $s.description ?? "(no description)"
-              $msg = ($msg -replace '\|', '&#124;')
-
+              $msg = Escape-Markdown ($s.message ?? $s.description ?? "(no description)")
               $line = $s.line ?? $s.line_number ?? "-"
 
               $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
             }
 
-            # AI ISSUES
+            # ----- AI ISSUES -----
             $aiIssues = $json.data.issues
 
             foreach ($issue in $aiIssues) {
 
               $severity = ($issue.severity).ToString().ToLower()
-
               if ($severity -in @("critical","high")) { $aiCritical++ }
 
               $sevEmoji = switch ($severity) {
@@ -155,18 +181,17 @@ jobs:
                 "low"      { "🟢 Low" }
                 default    { $severity }
               }
-              # ESCAPE CHARACTERS TO PREVENT TABLE BREAK
-              $msg = ($issue.message ?? "(no message)") -replace "\|", "\`|"
-              $category = ($issue.category ?? "general") -replace "\|", "\`|"
-              $issueFile = ($issue.file_path ?? $filePathTop) -replace "\|", "\`|"
 
+              $msg = Escape-Markdown ($issue.message ?? "(no message)")
+              $category = Escape-Markdown ($issue.category ?? "general")
+              $issueFile = Escape-Markdown ($issue.file_path ?? $filePathTop)
               $line = $issue.line_number ?? "-"
 
               $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
             }
-          } 
+          }
 
-          # BUILD MARKDOWN
+          # ----- BUILD MARKDOWN -----
           $md = @()
           $md += "# 🧠 AI Code Review Results"
           $md += ""
@@ -178,13 +203,11 @@ jobs:
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
-          if ($aiCritical -gt 0) {
-            $md += "## 🤖 AI-Detected Issues"
-            $md += "| File | Category | Severity | Message | Line |"
-            $md += "|------|----------|----------|---------|------|"
-            $md += $aiRows.TrimEnd()
-            $md += "---"
-          }
+          $md += "## 🤖 AI-Detected Issues (All Severities)"
+          $md += "| File | Category | Severity | Message | Line |"
+          $md += "|------|----------|----------|---------|------|"
+          $md += $aiRows.TrimEnd()
+          $md += "---"
 
           if ($staticCritical -gt 0) {
             $md += "## 🛡️ Static Security Issues"
@@ -197,19 +220,15 @@ jobs:
           $md += "## 🚦 Quality Gate Status"
           $md += "| Check | Status | Metric |"
           $md += "|--------|--------|--------|"
-
           $md += ($aiCritical -gt 0) ?
             "| AI Review | 🔴 FAIL | $aiCritical critical issues |" :
             "| AI Review | 🟢 PASS | 0 critical issues |"
-
           $md += ($staticCritical -gt 0) ?
             "| Security | 🔴 FAIL | $staticCritical static issues |" :
             "| Security | 🟢 PASS | 0 static issues |"
-
           $md += ($complexityFails -gt 0) ?
             "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" :
             "| Complexity | 🟢 PASS | Within $maxComplexity limit |"
-
           $md += ($maintFails -gt 0) ?
             "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
             "| Maintainability | 🟢 PASS | Above $minMaintainability |"
@@ -288,4 +307,3 @@ jobs:
 
             if (failed) {
               core.setFailed("Quality Gates Failed ❌");
-            }

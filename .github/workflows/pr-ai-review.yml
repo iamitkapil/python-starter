@@ -209,13 +209,13 @@ jobs:
           $md += $aiRows.TrimEnd()
           $md += "---"
 
-          if ($staticCritical -gt 0) {
+          # ---- if ($staticCritical -gt 0) { ----
             $md += "## 🛡️ Static Security Issues"
             $md += "| File | Type | Severity | Message | Line |"
             $md += "|------|------|----------|---------|------|"
             $md += $staticRows.TrimEnd()
             $md += "---"
-          }
+          # ---- } ----
 
           $md += "## 🚦 Quality Gate Status"
           $md += "| Check | Status | Metric |"

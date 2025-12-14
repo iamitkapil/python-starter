@@ -163,7 +163,8 @@ jobs:
               $line = $issue.line_number ?? "-"
 
               $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
-          }
+            }
+          } 
 
           # BUILD MARKDOWN
           $md = @()

@@ -16,15 +16,15 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # ------------------------------
+      # ---------------------------------------
       # CHECKOUT
-      # ------------------------------
+      # ---------------------------------------
       - name: Checkout PR Code
         uses: actions/checkout@v4
 
-      # ------------------------------
+      # ---------------------------------------
       # DETECT CHANGED PYTHON FILES
-      # ------------------------------
+      # ---------------------------------------
       - name: Detect Changed Python Files
         id: detect
         shell: pwsh
@@ -38,9 +38,9 @@ jobs:
 
           $changed | Out-File changed_files.txt -Encoding utf8
 
-      # ------------------------------
-      # RUN AI REVIEW
-      # ------------------------------
+      # ---------------------------------------
+      # RUN AI BACKEND REVIEW
+      # ---------------------------------------
       - name: Run AI Review on Changed Files
         id: review
         shell: pwsh
@@ -74,9 +74,9 @@ jobs:
             Write-Host "Saved: $outfile"
           }
 
-      # ------------------------------
-      # COMBINE + ENTERPRISE REPORT
-      # ------------------------------
+      # ---------------------------------------
+      # ENTERPRISE MARKDOWN REPORT
+      # ---------------------------------------
       - name: Enterprise Markdown Report
         id: combine
         shell: pwsh
@@ -85,95 +85,100 @@ jobs:
 
           if (-not $files) {
             "# 🧠 AI Code Review Results`n_No Python files changed._" |
-                Out-File feedback.md -Encoding utf8
+              Out-File feedback.md -Encoding utf8
             exit 0
           }
 
-          # Counters
           $aiCritical = 0
           $staticCritical = 0
           $complexityFails = 0
           $maintFails = 0
 
-          # Rows
           $aiRows = ""
           $staticRows = ""
 
-          # Thresholds
           $maxComplexity = 10
           $minMaintainability = 60
 
           foreach ($file in $files) {
 
-              # Load and parse JSON
-              $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
 
-              $filePathTop = $json.data.file_path
+            $filePathTop = $json.data.file_path
 
-              # ========== STATIC METRICS ==========
-              $metrics = $json.data.metrics
-              $complexity = $metrics.complexity_metrics.cyclomatic_complexity
-              $maint = $metrics.maintainability_metrics.maintainability_index
-              $sec = $metrics.security_issues
+            # STATIC METRICS
+            $metrics = $json.data.metrics
+            $complexity = $metrics.complexity_metrics.cyclomatic_complexity
+            $maint = $metrics.maintainability_metrics.maintainability_index
+            $sec = $metrics.security_issues
 
-              if ($complexity -gt $maxComplexity) { $complexityFails++ }
-              if ($maint -lt $minMaintainability) { $maintFails++ }
+            if ($complexity -gt $maxComplexity) { $complexityFails++ }
+            if ($maint -lt $minMaintainability) { $maintFails++ }
 
-              # ========== STATIC SECURITY TABLE ==========
-              foreach ($s in $sec) {
+            # STATIC SECURITY
+            foreach ($s in $sec) {
 
-                  $sev = ($s.severity).ToLower()
+              $sev = ($s.severity).ToLower()
 
-                  # Count static criticals
-                  if ($sev -in @("critical","high")) { $staticCritical++ }
+              if ($sev -in @("critical","high")) { $staticCritical++ }
 
-                  $sevEmoji = switch ($sev) {
-                      "critical" { "🛑 Critical" }
-                      "high"     { "🔴 High" }
-                      "medium"   { "🟡 Medium" }
-                      "low"      { "🟢 Low" }
-                      default    { $sev }
-                  }
-
-                  $msg = $s.message ?? $s.description ?? "(no description)"
-                  $line = $s.line ?? $s.line_number ?? "-"
-
-                  $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
+              $sevEmoji = switch ($sev) {
+                "critical" { "🛑 Critical" }
+                "high"     { "🔴 High" }
+                "medium"   { "🟡 Medium" }
+                "low"      { "🟢 Low" }
+                default    { $sev }
               }
 
-              # ========== AI ISSUES TABLE ==========
-              $aiIssues = $json.data.issues
+              $msg = $s.message ?? $s.description ?? "(no description)"
+              $line = $s.line ?? $s.line_number ?? "-"
 
-              foreach ($issue in $aiIssues) {
+              $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
+            }
 
-                  # Normalize severity
-                  $severity = ($issue.severity).ToString().ToLower()
+            # AI ISSUES
+            $aiIssues = $json.data.issues
 
-                  # Count high/critical
-                  if ($severity -in @("critical","high")) { $aiCritical++ }
+            foreach ($issue in $aiIssues) {
 
-                  # Emoji
-                  $sevEmoji = switch ($severity) {
-                      "critical" { "🛑 Critical" }
-                      "high"     { "🔴 High" }
-                      "medium"   { "🟡 Medium" }
-                      "low"      { "🟢 Low" }
-                      default    { $severity }
-                  }
+              $severity = ($issue.severity).ToString().ToLower()
 
-                  # Normalize fields
-                  $issueFile = $issue.file_path ?? $filePathTop
-                  $category  = $issue.category ?? ""
-                  $msg       = $issue.message ?? "(no message)"
-                  $line      = $issue.line_number ?? "-"
+              if ($severity -in @("critical","high")) { $aiCritical++ }
 
-                  $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
+              $sevEmoji = switch ($severity) {
+                "critical" { "🛑 Critical" }
+                "high"     { "🔴 High" }
+                "medium"   { "🟡 Medium" }
+                "low"      { "🟢 Low" }
+                default    { $severity }
               }
+
+              # FIX: normalize fields completely
+              $issueFile = if ([string]::IsNullOrWhiteSpace($issue.file_path)) {
+                $filePathTop
+              } else {
+                $issue.file_path
+              }
+
+              $category = if ([string]::IsNullOrWhiteSpace($issue.category)) {
+                "general"
+              } else {
+                $issue.category
+              }
+
+              $msg = if ([string]::IsNullOrWhiteSpace($issue.message)) {
+                "(no message)"
+              } else {
+                $issue.message
+              }
+
+              $line = $issue.line_number ?? "-"
+
+              $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
+            }
           }
 
-          # ================================
-          # START BUILDING MARKDOWN
-          # ================================
+          # BUILD MARKDOWN
           $md = @()
           $md += "# 🧠 AI Code Review Results"
           $md += ""
@@ -185,61 +190,56 @@ jobs:
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
-          # -------- AI CRITICAL ISSUES TABLE --------
           if ($aiCritical -gt 0) {
-              $md += "## 🤖 AI-Detected Critical Issues"
-              $md += "| File | Category | Severity | Message | Line |"
-              $md += "|------|----------|----------|---------|------|"
-              $md += $aiRows.TrimEnd()
-              $md += "---"
+            $md += "## 🤖 AI-Detected Critical Issues"
+            $md += "| File | Category | Severity | Message | Line |"
+            $md += "|------|----------|----------|---------|------|"
+            $md += $aiRows.TrimEnd()
+            $md += "---"
           }
 
-          # -------- STATIC SECURITY TABLE --------
           if ($staticCritical -gt 0) {
-              $md += "## 🛡️ Static Security Issues"
-              $md += "| File | Type | Severity | Message | Line |"
-              $md += "|------|------|----------|---------|------|"
-              $md += $staticRows.TrimEnd()
-              $md += "---"
+            $md += "## 🛡️ Static Security Issues"
+            $md += "| File | Type | Severity | Message | Line |"
+            $md += "|------|------|----------|---------|------|"
+            $md += $staticRows.TrimEnd()
+            $md += "---"
           }
 
-          # -------- QUALITY GATE TABLE --------
           $md += "## 🚦 Quality Gate Status"
           $md += "| Check | Status | Metric |"
           $md += "|--------|--------|--------|"
 
           $md += ($aiCritical -gt 0) ?
-              "| AI Review | 🔴 FAIL | $aiCritical critical issues |" :
-              "| AI Review | 🟢 PASS | 0 critical issues |"
+            "| AI Review | 🔴 FAIL | $aiCritical critical issues |" :
+            "| AI Review | 🟢 PASS | 0 critical issues |"
 
           $md += ($staticCritical -gt 0) ?
-              "| Security | 🔴 FAIL | $staticCritical static issues |" :
-              "| Security | 🟢 PASS | 0 static issues |"
+            "| Security | 🔴 FAIL | $staticCritical static issues |" :
+            "| Security | 🟢 PASS | 0 static issues |"
 
           $md += ($complexityFails -gt 0) ?
-              "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" :
-              "| Complexity | 🟢 PASS | Within $maxComplexity limit |"
+            "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" :
+            "| Complexity | 🟢 PASS | Within $maxComplexity limit |"
 
           $md += ($maintFails -gt 0) ?
-              "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
-              "| Maintainability | 🟢 PASS | Above $minMaintainability |"
+            "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
+            "| Maintainability | 🟢 PASS | Above $minMaintainability |"
 
-          # Write output
           $md -join "`n" | Out-File feedback.md -Encoding utf8
 
-
-      # ------------------------------
+      # ---------------------------------------
       # UPLOAD ARTIFACT
-      # ------------------------------
+      # ---------------------------------------
       - name: Upload AI Review JSON
         uses: actions/upload-artifact@v4
         with:
           name: ai-review-json
           path: ai_reviews/*.json
 
-      # ------------------------------
-      # POST GITHUB PR COMMENT
-      # ------------------------------
+      # ---------------------------------------
+      # POST PR COMMENT
+      # ---------------------------------------
       - name: Post AI Feedback as PR Comment
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
@@ -275,9 +275,9 @@ jobs:
               });
             }
 
-      # ------------------------------
-      # COMMIT STATUS (Quality Gate)
-      # ------------------------------
+      # ---------------------------------------
+      # COMMIT STATUS
+      # ---------------------------------------
       - name: Set PR Quality Gate Status
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'

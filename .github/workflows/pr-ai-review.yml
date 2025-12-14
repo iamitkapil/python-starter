@@ -89,34 +89,42 @@ jobs:
             exit 0
           }
 
+          # Counters
           $aiCritical = 0
           $staticCritical = 0
+          $complexityFails = 0
+          $maintFails = 0
 
+          # Tables
           $aiRows = ""
           $staticRows = ""
 
+          # Thresholds
           $maxComplexity = 10
           $minMaintainability = 60
-
-          $complexityFails = 0
-          $maintFails = 0
 
           foreach ($file in $files) {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
 
-            $filePath = $json.data.file_path
+            # ALWAYS use file_path inside each issue (not top-level file_path)
+            $filePathTop = $json.data.file_path
 
-            # STATIC
-            $m = $json.data.metrics
-            $complexity = $m.complexity_metrics.cyclomatic_complexity
-            $maint      = $m.maintainability_metrics.maintainability_index
-            $sec        = $m.security_issues
+            # ==========================
+            # STATIC METRICS
+            # ==========================
+            $metrics = $json.data.metrics
+            $complexity = $metrics.complexity_metrics.cyclomatic_complexity
+            $maint = $metrics.maintainability_metrics.maintainability_index
+            $sec = $metrics.security_issues
 
             if ($complexity -gt $maxComplexity) { $complexityFails++ }
             if ($maint -lt $minMaintainability) { $maintFails++ }
 
-            # STATIC SECURITY TABLE
+            # ==========================
+            # STATIC SECURITY ISSUES
+            # ==========================
             foreach ($s in $sec) {
+
               $sevEmoji = switch ($s.severity.ToLower()) {
                 "critical" { "🛑 Critical" }
                 "high"     { "🔴 High" }
@@ -130,41 +138,47 @@ jobs:
 
               if ($s.severity -in @("critical","high")) { $staticCritical++ }
 
-              $staticRows += "| $($s.type) | $sevEmoji | $msg | $line |\n"
+              $staticRows += "| $filePathTop | $($s.type) | $sevEmoji | $msg | $line |\n"
             }
 
-            # AI ISSUES
-            $ai = $json.data.issues
+            # ==========================
+            # AI ISSUES (MULTIPLE)
+            # ==========================
+            $aiIssues = $json.data.issues
 
-            if ($ai) {
-              foreach ($a in $ai) {
-                if ($a.severity -in @("critical","high")) { $aiCritical++ }
+            foreach ($issue in $aiIssues) {
 
-                $sevEmoji = switch ($a.severity) {
-                  "critical" { "🛑 Critical" }
-                  "high"     { "🔴 High" }
-                  "medium"   { "🟡 Medium" }
-                  "low"      { "🟢 Low" }
-                  default    { $a.severity }
-                }
+              $issueFile = $issue.file_path ?? $filePathTop
+              $severity = $issue.severity
 
-                $msg  = $a.message ?? "(no message)"
-                $line = $a.line_number ?? "-"
+              if ($severity -in @("critical","high")) { $aiCritical++ }
 
-                $aiRows += "| $filePath | $($a.category) | $sevEmoji | $msg | $line |\n"
+              $sevEmoji = switch ($severity) {
+                "critical" { "🛑 Critical" }
+                "high"     { "🔴 High" }
+                "medium"   { "🟡 Medium" }
+                "low"      { "🟢 Low" }
+                default    { $severity }
               }
+
+              $msg = $issue.message ?? "(no message)"
+              $line = $issue.line_number ?? "-"
+
+              $aiRows += "| $issueFile | $($issue.category) | $sevEmoji | $msg | $line |\n"
             }
           }
 
-          # BUILD MARKDOWN
+          # ==========================
+          # FINAL MARKDOWN BUILD
+          # ==========================
           $md = @()
           $md += "# 🧠 AI Code Review Results"
           $md += ""
           $md += "## 🔍 Summary"
-          $md += "- **$staticCritical files with STATIC security issues**"
+          $md += "- **$staticCritical STATIC security issues**"
           $md += "- **$aiCritical AI-detected high/critical issues**"
-          $md += "- **$complexityFails files failed complexity threshold**"
-          $md += "- **$maintFails files with low maintainability**"
+          $md += "- **$complexityFails complexity failures**"
+          $md += "- **$maintFails low maintainability files**"
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
@@ -178,8 +192,8 @@ jobs:
 
           if ($staticCritical -gt 0) {
             $md += "## 🛡️ Static Security Issues"
-            $md += "| Type | Severity | Message | Line |"
-            $md += "|------|----------|---------|------|"
+            $md += "| File | Type | Severity | Message | Line |"
+            $md += "|------|------|----------|---------|------|"
             $md += $staticRows.TrimEnd()
             $md += "---"
           }
@@ -188,7 +202,7 @@ jobs:
           $md += "| Check | Status | Metric |"
           $md += "|--------|--------|--------|"
 
-          $md += ($aiCritical -gt 0) ? 
+          $md += ($aiCritical -gt 0) ?
             "| AI Review | 🔴 FAIL | $aiCritical critical issues |" :
             "| AI Review | 🟢 PASS | 0 critical issues |"
 

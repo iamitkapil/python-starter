@@ -109,30 +109,48 @@ jobs:
           foreach ($f in $files) {
             $json = Get-Content $f.FullName -Raw | ConvertFrom-Json
 
+            # ------------------------
             # STATIC METRICS
+            # ------------------------
             $metrics = $json.data.metrics
             $complexity = $metrics.complexity_metrics.cyclomatic_complexity
             $maint = $metrics.maintainability_metrics.maintainability_index
             $secIssues = $metrics.security_issues
 
-            # AI METRICS
+            # ------------------------
+            # AI ISSUES
+            # ------------------------
             $aiIssues = $json.data.issues
-            $optim = $json.data.optimization_suggestions
-            $overallScore = $json.data.overall_score
 
-            # COUNT AI critical
             if ($aiIssues) {
               foreach ($ai in $aiIssues) {
                 if ($ai.severity -in @("high","critical")) {
+
+                  # SAFE DEFAULTS
+                  $cat = $ai.category
+                  if (-not $cat) { $cat = "unknown" }
+
+                  $sev = $ai.severity
+                  if (-not $sev) { $sev = "high" }
+
+                  $msg = $ai.message
+                  if (-not $msg) { $msg = "(no message provided)" }
+
+                  $line = $ai.line_number
+                  if (-not $line) { $line = "-" }
+
+                  # Add to table
                   $aiCriticalIssues++
-                  $aiTable += "| $($ai.category) | $($ai.severity) | $($ai.message) | $($ai.line_number) |\n"
+                  $aiTable += "| $cat | $sev | $msg | $line |\n"
                 }
               }
             }
 
+            # ------------------------
             # STATIC SECURITY
+            # ------------------------
             if ($secIssues -and $secIssues.Count -gt 0) {
-              $securityIssueCount += 1
+              $securityIssueCount++
 
               foreach ($issue in $secIssues) {
                 $sevEmoji = switch ($issue.severity.ToLower()) {
@@ -143,29 +161,31 @@ jobs:
                   default    { $issue.severity }
                 }
 
-                # FIX: Support multiple message field names
-                $message = $issue.message
+                # Graceful message fallback
+                $msg = $issue.message
+                if (-not $msg) { $msg = $issue.description }
+                if (-not $msg) { $msg = $issue.details }
+                if (-not $msg) { $msg = "(no message provided)" }
 
-                if (-not $message) { $message = $issue.description }
-                if (-not $message) { $message = $issue.details }
-                if (-not $message) { $message = "(no description available)" }
-
-                # FIX: Support "line" or "line_number"
+                # Handle missing line
                 $line = $issue.line
                 if (-not $line) { $line = $issue.line_number }
                 if (-not $line) { $line = "-" }
 
-
-                $securityTable += "| $($issue.type) | $sevEmoji | $message | $line |\n"
+                $securityTable += "| $($issue.type) | $sevEmoji | $msg | $line |\n"
               }
             }
 
-            # FAIL checks
-            if ($complexity -gt $maxComplexity)    { $complexityFails++ }
-            if ($maint -lt $minMaintainability)    { $maintFails++ }
+            # ------------------------
+            # FAIL CHECKS (Quality Gates)
+            # ------------------------
+            if ($complexity -gt $maxComplexity) { $complexityFails++ }
+            if ($maint -lt $minMaintainability) { $maintFails++ }
           }
 
-          # --- SUMMARY ---
+          # ------------------------
+          # BUILD MARKDOWN REPORT
+          # ------------------------
           $md = @()
           $md += "# 🧠 AI Code Review Results"
           $md += ""
@@ -179,7 +199,9 @@ jobs:
           $md += "---"
           $md += ""
 
-          # --- AI ISSUES TABLE ---
+          # ------------------------
+          # AI TABLE
+          # ------------------------
           if ($aiCriticalIssues -gt 0) {
             $md += "## 🤖 AI-Detected Critical Issues"
             $md += ""
@@ -191,7 +213,9 @@ jobs:
             $md += ""
           }
 
-          # --- STATIC SECURITY TABLE ---
+          # ------------------------
+          # STATIC TABLE
+          # ------------------------
           if ($securityIssueCount -gt 0) {
             $md += "## 🛡️ Static Security Issues"
             $md += ""
@@ -203,23 +227,41 @@ jobs:
             $md += ""
           }
 
-          # --- QUALITY GATES ---
+          # ------------------------
+          # QUALITY GATES
+          # ------------------------
           $md += "## 🚦 Quality Gate Status"
           $md += ""
           $md += "| Check | Status | Metric |"
           $md += "|--------|--------|--------|"
           
-          if ($aiCriticalIssues -gt 0) { $md += "| AI Review | 🔴 FAIL | $aiCriticalIssues critical issues |" }
-          else                         { $md += "| AI Review | 🟢 PASS | 0 critical issues |" }
+          if ($aiCriticalIssues -gt 0) {
+            $md += "| AI Review | 🔴 FAIL | $aiCriticalIssues critical issues |"
+          }
+          else {
+            $md += "| AI Review | 🟢 PASS | 0 critical issues |"
+          }
 
-          if ($securityIssueCount -gt 0) { $md += "| Security | 🔴 FAIL | $securityIssueCount static issues |" }
-          else                           { $md += "| Security | 🟢 PASS | 0 static issues |" }
+          if ($securityIssueCount -gt 0) {
+            $md += "| Security | 🔴 FAIL | $securityIssueCount static issues |"
+          }
+          else {
+            $md += "| Security | 🟢 PASS | 0 static issues |"
+          }
 
-          if ($complexityFails -gt 0)    { $md += "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |" }
-          else                           { $md += "| Complexity | 🟢 PASS | Within $maxComplexity limit" }
+          if ($complexityFails -gt 0) {
+            $md += "| Complexity | 🔴 FAIL | Max allowed: $maxComplexity |"
+          }
+          else {
+            $md += "| Complexity | 🟢 PASS | Within $maxComplexity limit |"
+          }
 
-          if ($maintFails -gt 0)         { $md += "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" }
-          else                           { $md += "| Maintainability | 🟢 PASS | Above $minMaintainability" }
+          if ($maintFails -gt 0) {
+            $md += "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |"
+          }
+          else {
+            $md += "| Maintainability | 🟢 PASS | Above $minMaintainability |"
+          }
 
           $md += ""
 

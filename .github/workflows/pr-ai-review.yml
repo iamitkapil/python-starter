@@ -191,12 +191,19 @@ jobs:
           $md += "- **$($files.Count) total files analyzed**"
           $md += "---"
 
-          # ALWAYS SHOW FULL AI LIST
-          $md += "## 🤖 AI-Detected Issues"
-          $md += "| File | Category | Severity | Message | Line |"
-          $md += "|------|----------|----------|---------|------|"
-          $md += $aiRows.TrimEnd()
-          $md += "---"
+
+          # ALWAYS SHOW ALL AI ISSUES (not just critical)
+          if ($aiRows.Trim()) {
+            $md += "## 🤖 AI-Detected Issues"
+            $md += "| File | Category | Severity | Message | Line |"
+            $md += "|------|----------|----------|---------|------|"
+            $md += $aiRows.TrimEnd()
+            $md += "---"
+          } else {
+            $md += "## 🤖 AI-Detected Issues"
+            $md += "_No AI-detected issues found._"
+            $md += "---"
+          }
 
           if ($staticCritical -gt 0) {
             $md += "## 🛡️ Static Security Issues"

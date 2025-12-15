@@ -171,44 +171,44 @@ jobs:
 
             foreach ($issue in $aiIssues) {
 
-                $severity = ($issue.severity).ToString().ToLower()
+              $severity = ($issue.severity).ToString().ToLower()
 
-                # Count critical/high
-                if ($severity -in @("critical","high")) { 
-                    $aiCritical++ 
-                }
+              # Count critical/high
+              if ($severity -in @("critical","high")) { 
+                  $aiCritical++ 
+              }
 
-                # Severity Icons
-                $sevEmoji = switch ($severity) {
-                    "critical" { "🛑 Critical" }
-                    "high"     { "🔴 High" }
-                    "medium"   { "🟡 Medium" }
-                    "low"      { "🟢 Low" }
-                    default    { $severity }
-                }
+              # Severity Icons
+              $sevEmoji = switch ($severity) {
+                  "critical" { "🛑 Critical" }
+                  "high"     { "🔴 High" }
+                  "medium"   { "🟡 Medium" }
+                  "low"      { "🟢 Low" }
+                  default    { $severity }
+              }
 
-                # SAFE FIELDS
-                $msg = Escape-Markdown ($issue.message ?? "(no message)")
-                $category = Escape-Markdown ($issue.category ?? "general")
-                $issueFile = Escape-Markdown ($issue.file_path ?? $filePathTop)
-                $line = $issue.line_number ?? "-"
+              # SAFE FIELDS
+              $msg = Escape-Markdown ($issue.message ?? "(no message)")
+              $category = Escape-Markdown ($issue.category ?? "general")
+              $issueFile = Escape-Markdown ($issue.file_path ?? $filePathTop)
+              $line = $issue.line_number ?? "-"
 
-                # ADD TABLE ROW
-                $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |`n"
+              # ADD TABLE ROW
+              $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |`n"
 
-                # ---------------------------------------------------
-                #  COLLECT ONLY CRITICAL & HIGH SUGGESTIONS
-                # ---------------------------------------------------
-                if ($severity -in @("critical","high")) {
+              # ---------------------------------------------------
+              #  COLLECT ONLY CRITICAL & HIGH SUGGESTIONS
+              # ---------------------------------------------------
+              if ($severity -in @("critical","high")) {
 
-                    if (-not $global:allSuggestions.ContainsKey($filePathTop)) {
-                        $global:allSuggestions[$filePathTop] = @()
-                    }
+                  if (-not $global:allSuggestions.ContainsKey($filePathTop)) {
+                      $global:allSuggestions[$filePathTop] = @()
+                  }
 
-                    $suggest = $issue.suggestion
-                    if ($suggest -and $suggest.Trim() -ne "") {
-                        $global:allSuggestions[$filePathTop] += $suggest
-                    }
+                  $suggest = $issue.suggestion
+                  if ($suggest -and $suggest.Trim() -ne "") {
+                      $global:allSuggestions[$filePathTop] += $suggest
+                  }
                 }
             }
           }  # ← THIS BRACE WAS MISSING BEFORE (NOW FIXED)

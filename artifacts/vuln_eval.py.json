@@ -1,0 +1,87 @@
+{
+  "success": true,
+  "data": {
+    "file_path": "app/vuln_eval.py",
+    "issues": [
+      {
+        "file_path": "app/vuln_eval.py",
+        "line_number": 7,
+        "severity": "critical",
+        "category": "security",
+        "message": "Use of eval/exec detected — unsafe dynamic execution. (OWASP A03:2021 - Injection, CWE-94: Improper Control of Generation of Code ('Code Injection'))",
+        "suggestion": "Avoid eval/exec. This function executes arbitrary Python code from user-supplied input. For evaluating literal data structures, use `ast.literal_eval`. For other cases, consider a strict allowlist parser or redesign the functionality to avoid dynamic execution.",
+        "confidence": 1.0
+      },
+      {
+        "file_path": "app/vuln_eval.py",
+        "line_number": 2,
+        "severity": "high",
+        "category": "test_coverage",
+        "message": "Functions `run_expression_vulnerable` and `run_expression_secure` lack dedicated unit tests.",
+        "suggestion": "Implement comprehensive unit tests (e.g., using `unittest` or `pytest`) for both `run_expression_vulnerable` (to demonstrate vulnerability if desired, or ensure secure alternative is used) and `run_expression_secure` (to verify correct behavior for valid inputs and error handling for invalid ones). The `if __name__ == '__main__':` block is not a substitute for formal tests.",
+        "confidence": 0.9
+      },
+      {
+        "file_path": "app/vuln_eval.py",
+        "line_number": 12,
+        "severity": "low",
+        "category": "best_practice",
+        "message": "Import statement `import ast` is not placed at the top of the file.",
+        "suggestion": "According to PEP 8, all import statements should generally be placed at the beginning of the module, after any module docstrings and `__future__` imports, but before other code.",
+        "confidence": 0.8
+      },
+      {
+        "file_path": "",
+        "line_number": 8,
+        "severity": "critical",
+        "category": "security",
+        "message": "Use of eval() detected",
+        "suggestion": "Avoid eval and use safe parsing",
+        "confidence": 0.9
+      }
+    ],
+    "metrics": {
+      "complexity_metrics": {
+        "cyclomatic_complexity": 5,
+        "average_complexity": 3,
+        "max_cyclomatic_complexity": 10,
+        "function_count": 1,
+        "lines_of_code": 24
+      },
+      "quality_metrics": {
+        "lines_of_code": 24,
+        "code_lines": 15,
+        "comment_lines": 2,
+        "blank_lines": 7,
+        "comment_ratio": 0.08333333333333333,
+        "code_to_comment_ratio": 7.5
+      },
+      "security_issues": [
+        {
+          "type": "unsafe_eval",
+          "severity": "high",
+          "description": "Use of eval/exec detected — avoid executing untrusted input.",
+          "remediation": "Review the unsafe pattern.",
+          "line_number": 8
+        }
+      ],
+      "performance_metrics": {
+        "performance_issues": [],
+        "suggestions": []
+      },
+      "maintainability_metrics": {
+        "maintainability_index": 71.66666666666667,
+        "readability_score": 8.333333333333332,
+        "testability_score": 75
+      },
+      "coverage_percentage": 0,
+      "test_success_percentage": 0,
+      "critical_issues_count": 0
+    },
+    "optimization_suggestions": [
+      "Pre-compile frequently reused expressions using `compile()` before passing to `eval()`.",
+      "Cache evaluation results for expressions that are computationally expensive and have repeated inputs."
+    ],
+    "overall_score": 75
+  }
+}

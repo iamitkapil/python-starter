@@ -75,6 +75,16 @@ jobs:
           }
 
       # ---------------------------------------
+      # DEBUG: OUTPUT AI REVIEW JSON CONTENTS
+      # ---------------------------------------
+      - name: Debug AI Review JSON
+        run: |
+          Get-ChildItem ai_reviews/*.json | ForEach-Object {
+            Write-Host "==== $($_.Name) ===="
+            Get-Content $_.FullName
+          }
+
+      # ---------------------------------------
       # ENTERPRISE MARKDOWN REPORT (FIXED)
       # ---------------------------------------
       - name: Enterprise Markdown Report

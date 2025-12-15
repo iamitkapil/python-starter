@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "data": {
+    "file_path": "tests/test_vul_eval.py",
+    "issues": [
+      {
+        "file_path": "tests/test_vuln_eval.py",
+        "line_number": 4,
+        "severity": "critical",
+        "category": "security",
+        "message": "The `test_eval_can_run_module_calls` function demonstrates that `run_expression_vulnerable` (imported from `app.vuln_eval`) allows arbitrary code execution, indicating a severe code injection vulnerability (OWASP A3: Injection, CWE-94: Improper Control of Generation of Code, MITRE ATT&CK T1059.005). While this file serves as a test, the existence of `run_expression_vulnerable` within the application, which is demonstrably susceptible to dynamic code execution, poses a critical security risk.",
+        "suggestion": "Immediately review the implementation of `app/vuln_eval.py`, specifically `run_expression_vulnerable`. Eliminate or refactor any use of `eval()`, `exec()`, or other dynamic code execution functions with untrusted input. For safe evaluation of Python literal data structures, prefer `ast.literal_eval`. For more complex parsing requirements, use a purpose-built, secure parser, and ensure proper input validation and sanitization are applied rigorously.",
+        "confidence": 1.0
+      }
+    ],
+    "metrics": {
+      "complexity_metrics": {
+        "cyclomatic_complexity": 5,
+        "average_complexity": 3,
+        "max_cyclomatic_complexity": 10,
+        "function_count": 1,
+        "lines_of_code": 17
+      },
+      "quality_metrics": {
+        "lines_of_code": 17,
+        "code_lines": 9,
+        "comment_lines": 4,
+        "blank_lines": 4,
+        "comment_ratio": 0.23529411764705882,
+        "code_to_comment_ratio": 2.25
+      },
+      "security_issues": [],
+      "performance_metrics": {
+        "performance_issues": [],
+        "suggestions": []
+      },
+      "maintainability_metrics": {
+        "maintainability_index": 74.70588235294117,
+        "readability_score": 23.52941176470588,
+        "testability_score": 75
+      },
+      "coverage_percentage": 0,
+      "test_success_percentage": 0,
+      "critical_issues_count": 0
+    },
+    "optimization_suggestions": [
+      "Extract repeated string literals into module-level constants for improved maintainability.",
+      "Consider using `pytest.mark.parametrize` for similar test cases to reduce duplication and enhance test suite organization.",
+      "No significant performance optimizations are necessary for these fast-executing unit tests, as their runtime is negligible."
+    ],
+    "overall_score": 95
+  }
+}

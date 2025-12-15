@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "data": {
+    "file_path": "tests/test_calculator.py",
+    "issues": [
+      {
+        "file_path": "tests/test_calculator.py",
+        "line_number": 1,
+        "severity": "high",
+        "category": "test_coverage",
+        "message": "All lines in this test file, including imports and test functions, are commented out. This renders the entire test suite inactive, providing no test coverage for the application code.",
+        "suggestion": "Uncomment the relevant test code (lines 1 through 17) to enable test execution. Ensure that tests are actively run as part of the CI/CD pipeline. If the tests are obsolete, remove them entirely.",
+        "confidence": 1.0
+      },
+      {
+        "file_path": "tests/test_calculator.py",
+        "line_number": 1,
+        "severity": "high",
+        "category": "maintainability",
+        "message": "The entire file is commented out, making its purpose unclear and indicating potentially dead or inactive code. This can lead to confusion and increased maintenance burden.",
+        "suggestion": "Either uncomment and activate the code to make it functional, or remove the file if it's no longer needed. Maintaining commented-out code hinders readability and project clarity.",
+        "confidence": 0.9
+      }
+    ],
+    "metrics": {
+      "complexity_metrics": {
+        "cyclomatic_complexity": 5,
+        "average_complexity": 3,
+        "max_cyclomatic_complexity": 10,
+        "function_count": 1,
+        "lines_of_code": 19
+      },
+      "quality_metrics": {
+        "lines_of_code": 19,
+        "code_lines": 0,
+        "comment_lines": 13,
+        "blank_lines": 6,
+        "comment_ratio": 0.6842105263157895,
+        "code_to_comment_ratio": 0.0
+      },
+      "security_issues": [],
+      "performance_metrics": {
+        "performance_issues": [],
+        "suggestions": []
+      },
+      "maintainability_metrics": {
+        "maintainability_index": 83.68421052631578,
+        "readability_score": 68.42105263157895,
+        "testability_score": 75
+      },
+      "coverage_percentage": 0,
+      "test_success_percentage": 0,
+      "critical_issues_count": 0
+    },
+    "optimization_suggestions": [
+      "Consolidate multiple test cases using pytest.mark.parametrize to reduce boilerplate.",
+      "Remove commented out or unused import statements."
+    ],
+    "overall_score": 90
+  }
+}

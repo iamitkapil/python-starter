@@ -1,0 +1,106 @@
+{
+  "success": true,
+  "data": {
+    "file_path": "app/recursion_check.py",
+    "issues": [
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "high",
+        "category": "test_coverage",
+        "message": "Lack of test coverage for function 'solve'.",
+        "suggestion": "Write unit tests for the `solve` function to ensure correctness across various inputs and edge cases (e.g., x <= 0, x > 0, depth limits, even/odd x).",
+        "confidence": 1.0
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "high",
+        "category": "performance",
+        "message": "Recursive function 'solve' lacks memoization, leading to redundant computations and exponential time complexity for overlapping subproblems. This pattern is related to CWE-730: Exponentially Large Data Set/Memory Consumption if 'x' is large.",
+        "suggestion": "Apply memoization (e.g., using `@functools.lru_cache` from the `functools` module) to store and reuse results of previous calls to `solve(x, depth)`, drastically improving performance for larger inputs.",
+        "confidence": 1.0
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "medium",
+        "category": "maintainability",
+        "message": "Function 'solve' is missing a docstring.",
+        "suggestion": "Add a comprehensive docstring explaining the purpose, parameters (`x`, `depth`), and return value of the function, along with any edge cases or complexities.",
+        "confidence": 0.9
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "medium",
+        "category": "maintainability",
+        "message": "Function 'solve' is missing type hints for its parameters and return value.",
+        "suggestion": "Add type hints to improve code readability, enable static analysis, prevent common errors, and provide better IDE support. Example: `def solve(x: int, depth: int = 0) -> int:`",
+        "confidence": 0.9
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "medium",
+        "category": "maintainability",
+        "message": "The function 'solve' has high cyclomatic complexity due to multiple conditional branches and numerous recursive calls, making it difficult to understand, test, and debug. This relates to CWE-1002: Function Too Long or Too Complex.",
+        "suggestion": "Consider refactoring parts of the complex logic into smaller, more focused helper functions. Explore an iterative solution, if feasible, to reduce the nesting and simplify the control flow.",
+        "confidence": 0.8
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 1,
+        "severity": "medium",
+        "category": "performance",
+        "message": "The deeply recursive nature of the function, despite a `depth` limit, could lead to a Python `RecursionError` (stack overflow) for sufficiently large inputs of `x` where the effective recursion depth exceeds Python's default limit, especially with complex interactions of `depth` increments and decrements.",
+        "suggestion": "Implement an iterative solution to avoid stack limits, or ensure the recursion depth is strictly controlled and accounted for across all branches. If recursion is essential, consider using memoization (as suggested above) which can implicitly reduce the effective stack depth by avoiding recomputation, or judiciously use `sys.setrecursionlimit` after careful memory and performance analysis.",
+        "confidence": 0.7
+      },
+      {
+        "file_path": "app/recursion_check.py",
+        "line_number": 3,
+        "severity": "low",
+        "category": "best_practice",
+        "message": "The hardcoded recursion depth limit '5' is a magic number.",
+        "suggestion": "Define '5' as a named constant (e.g., `MAX_RECURSION_DEPTH = 5`) to improve readability and maintainability. Consider making it a configurable parameter if this limit needs to vary based on usage contexts.",
+        "confidence": 0.8
+      }
+    ],
+    "metrics": {
+      "complexity_metrics": {
+        "cyclomatic_complexity": 5,
+        "average_complexity": 3,
+        "max_cyclomatic_complexity": 10,
+        "function_count": 1,
+        "lines_of_code": 19
+      },
+      "quality_metrics": {
+        "lines_of_code": 19,
+        "code_lines": 18,
+        "comment_lines": 0,
+        "blank_lines": 1,
+        "comment_ratio": 0.0,
+        "code_to_comment_ratio": null
+      },
+      "security_issues": [],
+      "performance_metrics": {
+        "performance_issues": [],
+        "suggestions": []
+      },
+      "maintainability_metrics": {
+        "maintainability_index": 70.0,
+        "readability_score": 0.0,
+        "testability_score": 75
+      },
+      "coverage_percentage": 0,
+      "test_success_percentage": 0,
+      "critical_issues_count": 0
+    },
+    "optimization_suggestions": [
+      "Implement memoization using `functools.lru_cache` to avoid recomputing identical subproblems.",
+      "Consider converting the recursive solution to an iterative dynamic programming approach to manage state explicitly and potentially improve performance."
+    ],
+    "overall_score": 90
+  }
+}

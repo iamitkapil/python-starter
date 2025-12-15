@@ -118,7 +118,7 @@ jobs:
           $complexityFails = 0
           $maintFails = 0
 
-          $aiRows = ""
+          $aiRows = @()   # ← ARRAY, NOT STRING
           $staticRows = ""
 
           $maxComplexity = 10
@@ -207,7 +207,7 @@ jobs:
             $md += "## 🤖 AI-Detected Issues"
             $md += "| File | Category | Severity | Message | Line |"
             $md += "|------|----------|----------|---------|------|"
-            $md += $aiRows.TrimEnd()
+            $md += ($aiRows -join "`n")
             $md += "---"
           } else {
             $md += "## 🤖 AI-Detected Issues"

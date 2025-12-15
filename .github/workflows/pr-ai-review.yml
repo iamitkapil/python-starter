@@ -117,7 +117,7 @@ jobs:
           $staticCritical = 0
           $complexityFails = 0
           $maintFails = 0
-
+          $global:allSuggestions = @{}
           $aiRows = @()   # ← ARRAY, NOT STRING
           $staticRows = ""
 
@@ -164,29 +164,53 @@ jobs:
             # AI ISSUES (FIX → ENSURE ALL ISSUES ARE LISTED)
             $aiIssues = $json.data.issues
 
-            foreach ($issue in $aiIssues) {
-
-              $severity = ($issue.severity).ToString().ToLower()
-
-              if ($severity -in @("critical","high")) { $aiCritical++ }
-
-              $sevEmoji = switch ($severity) {
-                "critical" { "🛑 Critical" }
-                "high"     { "🔴 High" }
-                "medium"   { "🟡 Medium" }
-                "low"      { "🟢 Low" }
-                default    { $severity }
-              }
-
-              $msg = Escape-Markdown ($issue.message ?? "(no message)")
-              $category = Escape-Markdown ($issue.category ?? "general")
-              $issueFile = Escape-Markdown ($issue.file_path ?? $filePathTop)
-
-              $line = $issue.line_number ?? "-"
-
-              $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |\n"
+            # Global suggestions bucket (per file)
+            if (-not $global:allSuggestions) {
+                $global:allSuggestions = @{}
             }
 
+            foreach ($issue in $aiIssues) {
+
+                $severity = ($issue.severity).ToString().ToLower()
+
+                # Count critical/high
+                if ($severity -in @("critical","high")) { 
+                    $aiCritical++ 
+                }
+
+                # Severity Icons
+                $sevEmoji = switch ($severity) {
+                    "critical" { "🛑 Critical" }
+                    "high"     { "🔴 High" }
+                    "medium"   { "🟡 Medium" }
+                    "low"      { "🟢 Low" }
+                    default    { $severity }
+                }
+
+                # SAFE FIELDS
+                $msg = Escape-Markdown ($issue.message ?? "(no message)")
+                $category = Escape-Markdown ($issue.category ?? "general")
+                $issueFile = Escape-Markdown ($issue.file_path ?? $filePathTop)
+                $line = $issue.line_number ?? "-"
+
+                # ADD TABLE ROW
+                $aiRows += "| $issueFile | $category | $sevEmoji | $msg | $line |`n"
+
+                # ---------------------------------------------------
+                #  COLLECT ONLY CRITICAL & HIGH SUGGESTIONS
+                # ---------------------------------------------------
+                if ($severity -in @("critical","high")) {
+
+                    if (-not $global:allSuggestions.ContainsKey($filePathTop)) {
+                        $global:allSuggestions[$filePathTop] = @()
+                    }
+
+                    $suggest = $issue.suggestion
+                    if ($suggest -and $suggest.Trim() -ne "") {
+                        $global:allSuggestions[$filePathTop] += $suggest
+                    }
+                }
+            }
           }  # ← THIS BRACE WAS MISSING BEFORE (NOW FIXED)
 
           # BUILD MARKDOWN
@@ -242,6 +266,30 @@ jobs:
           $md += ($maintFails -gt 0) ?
             "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
             "| Maintainability | 🟢 PASS | Above $minMaintainability |"
+
+          $md += "---"
+
+          if ($aiCritical -gt 0) {
+              # ---------------------------------------------------------
+              # ADD AI SUGGESTIONS (ONLY CRITICAL + HIGH)
+              # ---------------------------------------------------------
+              $md += "## 💡 AI Suggestions (Critical & High Only)"
+              $md += ""
+
+              foreach ($fileKey in $global:allSuggestions.Keys) {
+
+                  $md += "### 📄 $fileKey"
+
+                  $unique = $global:allSuggestions[$fileKey] | Select-Object -Unique
+
+                  foreach ($s in $unique) {
+                      $md += "- $(Escape-Markdown $s)"
+                  }
+
+                  $md += ""
+              }
+              $md += "---"
+          }
 
           $md -join "`n" | Out-File feedback.md -Encoding utf8
 

@@ -118,6 +118,7 @@ jobs:
           $complexityFails = 0
           $maintFails = 0
 
+          $global:allSuggestions = @{}  
           $aiRows = @()   # ← ARRAY, NOT STRING
           $staticRows = ""
 
@@ -168,7 +169,18 @@ jobs:
 
               $severity = ($issue.severity).ToString().ToLower()
 
-              if ($severity -in @("critical","high")) { $aiCritical++ }
+              if ($severity -in @("critical","high")) { 
+                $aiCritical++ 
+              
+                if (-not $global:allSuggestions.ContainsKey($filePathTop)) {
+                    $global:allSuggestions[$filePathTop] = @()
+                }
+
+                $suggest = $issue.suggestion
+                if ($suggest -and $suggest.Trim() -ne "") {
+                    $global:allSuggestions[$filePathTop] += $suggest
+                }
+              }
 
               $sevEmoji = switch ($severity) {
                 "critical" { "🛑 Critical" }
@@ -242,6 +254,28 @@ jobs:
           $md += ($maintFails -gt 0) ?
             "| Maintainability | 🔴 FAIL | Min required: $minMaintainability |" :
             "| Maintainability | 🟢 PASS | Above $minMaintainability |"
+
+          if ($aiCritical -gt 0) {
+            # ---------------------------------------------------------
+            # ADD AI SUGGESTIONS (ONLY CRITICAL + HIGH)
+            # ---------------------------------------------------------
+            $md += "## 💡 AI Suggestions (Critical & High Only)"
+            $md += ""
+
+            foreach ($fileKey in $global:allSuggestions.Keys) {
+
+                $md += "### 📄 $fileKey"
+
+                $unique = $global:allSuggestions[$fileKey] | Select-Object -Unique
+
+                foreach ($s in $unique) {
+                    $md += "- $(Escape-Markdown $s)"
+                }
+
+                $md += ""
+            }
+            $md += "---"
+          }
 
           $md -join "`n" | Out-File feedback.md -Encoding utf8
 

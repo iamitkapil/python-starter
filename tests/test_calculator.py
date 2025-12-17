@@ -1,8 +1,8 @@
-# from app.calculator import add, subtract, multiply, divide
-# import pytest
+from app.calculator import add #, subtract, multiply, divide
+import pytest
 
-# def test_add():
-#     assert add(2, 5) == 7
+def test_add():
+    assert add(2, 5) == 7
 
 # def test_subtract():
 #     assert subtract(10, 3) == 7

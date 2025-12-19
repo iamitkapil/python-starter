@@ -1,0 +1,180 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch: 
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  ai-review:
+    runs-on: self-hosted   
+
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+
+      - name: Detect Changed Python Files
+        id: detect
+        shell: pwsh
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: |
+          # Fetch the base branch from origin
+          git fetch origin $env:BASE_REF
+
+          # Get changed python files between base and HEAD
+          $changed = git diff --name-only origin/$env:BASE_REF -- '*.py'
+
+          Write-Output "Changed files:"
+          Write-Output $changed
+
+          # Write changed files to a file
+          $changed | Out-File -Encoding utf8 changed_files.txt
+
+          # Set output variable 'files' for next steps
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "files<<EOF"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value $changed
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "EOF"
+
+
+      - name: Run AI Review on Changed Files
+        id: review
+        shell: pwsh
+        run: |
+          # Create output folder
+          New-Item -ItemType Directory -Force -Path ai_reviews | Out-Null
+
+          Get-Content changed_files.txt | ForEach-Object {
+              $FILE = $_.Trim()
+              if (Test-Path $FILE) {
+
+                  Write-Host "Sending $FILE to AI agent..."
+
+                  # Escape quotes for JSON
+                  $CONTENT = Get-Content $FILE -Raw | ForEach-Object { $_ -replace '"', '\"' }
+
+                  # Build JSON payload
+                  $PAYLOAD = @{
+                      code = $CONTENT
+                      file_path = $FILE
+                      language = "python"
+                  } | ConvertTo-Json -Compress
+
+                  # Call AI agent API
+                  $RESPONSE = Invoke-RestMethod -Uri "http://localhost:8000/api/review/code" `
+                      -Method POST `
+                      -ContentType "application/json" `
+                      -Body $PAYLOAD
+
+                  # Save response
+                  $OUTFILE = "ai_reviews/$([System.IO.Path]::GetFileName($FILE)).json"
+                  $RESPONSE | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8 $OUTFILE
+
+                  Write-Host "AI Review for $FILE saved to $OUTFILE"
+              }
+          }
+
+
+      - name: Combine AI Results (Formatted Markdown)
+        id: combine
+        shell: pwsh
+        run: |
+          $output = @()
+          $output += "###  AI Code Review Results`n"
+
+          $files = Get-ChildItem -Path "ai_reviews" -Filter "*.json"
+          $hasIssues = $false
+
+          foreach ($file in $files) {
+            $data = Get-Content $file.FullName | ConvertFrom-Json
+            $filename = $file.BaseName
+            $metrics = $data.data.metrics
+
+            $output += "####  File: `$filename"
+            $output += "`n| Metric | Value |"
+            $output += "`n|--------|-------:|"
+            $output += "`n| Cyclomatic Complexity | $($metrics.complexity_metrics.cyclomatic_complexity) |"
+            $output += "`n| Average Complexity | $($metrics.complexity_metrics.average_complexity) |"
+            $output += "`n| Max Complexity | $($metrics.complexity_metrics.max_complexity) |"
+            $output += "`n| Function Count | $($metrics.complexity_metrics.function_count) |"
+            $output += "`n| Lines of Code | $($metrics.complexity_metrics.lines_of_code) |"
+            $output += "`n| Maintainability Index | $([math]::Round($metrics.maintainability_metrics.maintainability_index,2)) |"
+            $output += "`n| Readability Score | $([math]::Round($metrics.maintainability_metrics.readability_score,2)) |"
+            $output += "`n| Testability Score | $($metrics.maintainability_metrics.testability_score) |"
+            $output += "`n| Overall Score | $($data.data.overall_score) |`n"
+
+            if ($metrics.security_issues -and $metrics.security_issues.Count -gt 0) {
+              $hasIssues = $true
+              $output += "**Security Issues:**"
+              $output += "`n| Type | Severity | Message | Line |"
+              $output += "`n|------|-----------|----------|------|"
+              foreach ($issue in $metrics.security_issues) {
+                $output += "`n| $($issue.type) | $($issue.severity) | $($issue.message) | $($issue.line) |"
+              }
+            } else {
+              $output += "**Security Issues:**`n> _None detected._"
+            }
+
+            $output += "`n---`n"
+          }
+
+          # Add summary section
+          if ($hasIssues) {
+            $summary = "###  Summary: Security issues detected in one or more files."
+          } else {
+            $summary = "###  Summary: No security issues found."
+          }
+
+          ($summary, "`n", ($output -join "`n")) | Out-File -Encoding utf8 feedback.md
+
+
+
+      - name: Post AI Feedback as PR Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'feedback.md';
+
+            if (!fs.existsSync(path)) {
+              core.warning('feedback.md not found, skipping comment.');
+              return;
+            }
+
+            const body = fs.readFileSync(path, 'utf8');
+
+            // Create or update comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            // Look for existing AI feedback comment
+            const existing = comments.find(c => c.user.login === 'github-actions[bot]' && c.body.startsWith('### AI Code Review Results'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body
+              });
+              core.info('Updated existing AI feedback comment');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+              core.info('Posted new AI feedback comment');
+            }
+
+
